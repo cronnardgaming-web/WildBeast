@@ -4537,9 +4537,9 @@ const WBAdminPanel = (() => {
       </div>
       <hr class="admin-sep" />
       <div class="admin-section">
-        <div class="admin-section-title">💫 Score de puissance (Aura)</div>
+        <div class="admin-section-title">⭐ Score de puissance (Attrait)</div>
         <p style="font-size:.78rem;color:#888;margin-bottom:12px;">
-          Le score Aura d'un personnage est dérivé de la vraie formule de combat
+          Le score Attrait d'un personnage est dérivé de la vraie formule de combat
           (dégâts effectifs incluant le taux de critique, et PV effectifs incluant
           la DEF), calculés face à un adversaire fictif de référence défini ici.
           Une valeur basse récompense fortement la progression réelle du personnage.
@@ -4774,7 +4774,7 @@ const WBAdminPanel = (() => {
       <div class="admin-section">
         <div class="admin-section-title">🕊️ Esquive & Précision</div>
         <p style="font-size:.78rem;color:#888;margin-bottom:10px">
-          Plafonds de bonus/malus d'esquive et de précision basés sur l'écart de Grace (Agilité).
+          Plafonds de bonus/malus d'esquive et de précision basés sur l'écart d'Agilité.
           La valeur 0.10 signifie ±10% maximum.
         </p>
         <div class="admin-grid">
@@ -5902,21 +5902,21 @@ const WBAdminPanel = (() => {
 
   // ─── ONGLET FONDS D'ÉCRAN ───────────────────────────────────────────────────
 
-  // Écrans configurables (le Bureau/hub n'y figure pas volontairement,
+  // Écrans configurables (la Base/hub n'y figure pas volontairement,
   // cf. commentaire dans database.js — son illustration a des zones cliquables
   // positionnées en % qu'un fond de remplacement casserait).
   const BACKGROUND_SCREENS = [
     { key: 'combat',          label: '⚔️ Combat (pendant le combat)' },
     { key: 'combat-select',   label: '🗺️ Sélection du mode de combat' },
-    { key: 'team-hub',        label: '👥 Menu Équipe' },
+    { key: 'team-hub',        label: '🎒 Menu Préparation' },
     { key: 'collection',      label: '✨ Collection' },
     { key: 'team',            label: '🧩 Composition d\'équipe' },
-    { key: 'gacha',           label: '📜 Contrat (Gacha)' },
-    { key: 'equip',           label: '💍 Parures (Équipement)' },
+    { key: 'gacha',           label: '🤝 Sponsoring (Gacha)' },
+    { key: 'equip',           label: '⚔️ Équipements' },
     { key: 'inventory',       label: '🎒 Inventaire' },
     { key: 'shop',            label: '🛍️ Shop' },
-    { key: 'quests',          label: '📅 Escapades (Quêtes)' },
-    { key: 'catalogue',       label: '📖 Galerie (Catalogue)' },
+    { key: 'quests',          label: '🧭 Missions (Quêtes)' },
+    { key: 'catalogue',       label: '📚 Encyclopédie (Catalogue)' },
     { key: 'story-chapters',  label: '📖 Mode Histoire — Liste des chapitres' },
     { key: 'story-chapter',   label: '📖 Mode Histoire — Écran d\'un chapitre' },
   ];

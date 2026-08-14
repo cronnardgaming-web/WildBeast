@@ -32,7 +32,7 @@ const WBGameDatabase = (() => {
       critDivisor:    200,   // Diviseur pour le taux de crit : spd / (spd + critDivisor)
                               // ex: spd=200 → 50% crit, spd=50 → ~20%, spd=20 → ~9%
       critMultiplier: 1.5,   // Multiplicateur de dégâts sur un coup critique
-      // ── Score de puissance "Aura" ────────────────────────────────────────────
+      // ── Score de puissance "Attrait" ────────────────────────────────────────────
       // DEF d'un adversaire fictif de référence utilisée pour convertir les
       // stats d'un personnage en un score de puissance comparable (cf.
       // WBGameDatabase.computeAuraScore). Valeur volontairement basse et fixe
@@ -127,7 +127,7 @@ const WBGameDatabase = (() => {
     // ── Fonds d'écran personnalisés ─────────────────────────────────────────
     // Une image hébergée (URL) par écran. null/absent = fond par défaut du thème.
     // Clés = identifiants d'écran (mêmes que ceux utilisés par showScreen côté UI).
-    // Note : le Bureau (hub) n'est PAS inclus ici — il utilise sa propre
+    // Note : la Base (hub) n'est PAS inclus ici — elle utilise sa propre
     // illustration (hub.png) avec des zones cliquables positionnées en %,
     // la remplacer casserait l'alignement des zones de navigation.
     backgrounds: {
@@ -226,13 +226,13 @@ const WBGameDatabase = (() => {
       evolutions: { every: 50,    label: 'Évolutions'         },
       awakenings: { every: 100,   label: 'Éveils'             },
       goldEarned: { every: 10000, label: 'Dollars gagnés en combat' },
-      // ── Score Aura (calculés en direct, pas des compteurs cumulés) ──────────
+      // ── Score Attrait (calculés en direct, pas des compteurs cumulés) ──────────
       // Seuils à ajuster librement depuis l'admin selon l'échelle réelle des
       // scores obtenus en jeu.
-      scoreTotal: { every: 50000, label: 'Aura totale (collection)' },
-      scoreTeam:  { every: 10000, label: "Aura d'équipe (3 meilleurs scores)" },
+      scoreTotal: { every: 50000, label: 'Attrait total (collection)' },
+      scoreTeam:  { every: 10000, label: "Attrait d'équipe (3 meilleurs scores)" },
       tourneeProgress: { every: 25,  label: 'Sous-niveaux Tournée complétés' },
-      galleryEntries:  { every: 10,  label: 'Entrées débloquées (Galerie)' },
+      galleryEntries:  { every: 10,  label: 'Entrées débloquées (Encyclopédie)' },
     },
   };
 
@@ -865,12 +865,12 @@ const WBGameDatabase = (() => {
     { id: "wq_capture_15",      type: "capture_character",     target: 15, name: "Séduire 15 actrices",      reward: { type: "crystals", amount: 350 } },
     { id: "wq_defeat_25",       type: "defeat_enemies",        target: 25, name: "Remporter 25 duels",       reward: { type: "gold",     amount: 800 } },
     { id: "wq_defeat_50",       type: "defeat_enemies",        target: 50, name: "Remporter 50 duels",       reward: { type: "gold",     amount: 1500 } },
-    { id: "wq_summon_eq_5",     type: "summon_equipment",      target: 5,  name: "Découvrir 5 parures",      reward: { type: "gold",     amount: 300 } },
-    { id: "wq_summon_eq_25",    type: "summon_equipment",      target: 25, name: "Découvrir 25 parures",     reward: { type: "gold",     amount: 1200 } },
+    { id: "wq_summon_eq_5",     type: "summon_equipment",      target: 5,  name: "Découvrir 5 équipements",      reward: { type: "gold",     amount: 300 } },
+    { id: "wq_summon_eq_25",    type: "summon_equipment",      target: 25, name: "Découvrir 25 équipements",     reward: { type: "gold",     amount: 1200 } },
     { id: "wq_summon_char_5",   type: "summon_character",      target: 5,  name: "Faire 5 rencontres",       reward: { type: "crystals", amount: 250 } },
     { id: "wq_summon_char_50",  type: "summon_character",      target: 50, name: "Faire 50 rencontres",      reward: { type: "crystals", amount: 2000 } },
-    { id: "wq_line_5",          type: "win_line_combat",       target: 5,  name: "Triompher de 5 Sagas",     reward: { type: "gold",     amount: 800 } },
-    { id: "wq_line_15",         type: "win_line_combat",       target: 15, name: "Triompher de 15 Sagas",    reward: { type: "gold",     amount: 2000 } },
+    { id: "wq_line_5",          type: "win_line_combat",       target: 5,  name: "Triompher de 5 Élevages",     reward: { type: "gold",     amount: 800 } },
+    { id: "wq_line_15",         type: "win_line_combat",       target: 15, name: "Triompher de 15 Élevages",    reward: { type: "gold",     amount: 2000 } },
     { id: "wq_fullrandom_5",    type: "win_full_random_combat",target: 5,  name: "Réussir 5 Caprices",      reward: { type: "gold",     amount: 800 } },
     { id: "wq_fullrandom_15",   type: "win_full_random_combat",target: 15, name: "Réussir 15 Caprices",     reward: { type: "gold",     amount: 2000 } },
     { id: "wq_odyssey_5",       type: "win_odyssey_combat",    target: 5,  name: "Réussir 5 Tournées",      reward: { type: "item",     amount: 10, refId: "item_energy_potion" } },
@@ -884,12 +884,12 @@ const WBGameDatabase = (() => {
     { id: "quest_capture_3", type: "capture_character", target: 3, name: "Séduire 3 actrices", enabled: true, reward: { type: "crystals", amount: 70 } },
     { id: "quest_defeat_5", type: "defeat_enemies", target: 5, name: "Remporter 5 duels", enabled: true, reward: { type: "gold", amount: 150 } },
     { id: "quest_defeat_10", type: "defeat_enemies", target: 10, name: "Remporter 10 duels", enabled: true, reward: { type: "gold", amount: 300 } },
-    { id: "quest_summon_eq_1", type: "summon_equipment", target: 1, name: "Découvrir 1 parure", enabled: true, reward: { type: "gold", amount: 50 } },
-    { id: "quest_summon_eq_10", type: "summon_equipment", target: 10, name: "Découvrir 10 parures", enabled: true, reward: { type: "gold", amount: 550 } },
+    { id: "quest_summon_eq_1", type: "summon_equipment", target: 1, name: "Découvrir 1 équipement", enabled: true, reward: { type: "gold", amount: 50 } },
+    { id: "quest_summon_eq_10", type: "summon_equipment", target: 10, name: "Découvrir 10 équipements", enabled: true, reward: { type: "gold", amount: 550 } },
     { id: "quest_summon_char_1", type: "summon_character", target: 1, name: "Faire 1 rencontre", enabled: true, reward: { type: "crystals", amount: 50 } },
     { id: "quest_summon_char_10", type: "summon_character", target: 10, name: "Faire 10 rencontres", enabled: true, reward: { type: "crystals", amount: 550 } },
-    { id: "quest_line_1", type: "win_line_combat", target: 1, name: "Triompher d'1 Saga", enabled: true, reward: { type: "gold", amount: 150 } },
-    { id: "quest_line_3", type: "win_line_combat", target: 3, name: "Triompher de 3 Sagas", enabled: true, reward: { type: "gold", amount: 400 } },
+    { id: "quest_line_1", type: "win_line_combat", target: 1, name: "Triompher d'1 Élevage", enabled: true, reward: { type: "gold", amount: 150 } },
+    { id: "quest_line_3", type: "win_line_combat", target: 3, name: "Triompher de 3 Élevages", enabled: true, reward: { type: "gold", amount: 400 } },
     { id: "quest_fullrandom_1", type: "win_full_random_combat", target: 1, name: "Réussir 1 Caprice", enabled: true, reward: { type: "gold", amount: 150 } },
     { id: "quest_fullrandom_3", type: "win_full_random_combat", target: 3, name: "Réussir 3 Caprices", enabled: true, reward: { type: "gold", amount: 400 } },
     { id: "quest_odyssey_1", type: "win_odyssey_combat", target: 1, name: "Réussir 1 Tournée", enabled: true, reward: { type: "item", amount: 3, refId: "item_energy_potion" } },
@@ -1005,7 +1005,7 @@ const WBGameDatabase = (() => {
     },
 
     /**
-     * Calcule le score de puissance "Aura" d'un personnage à partir de ses
+     * Calcule le score de puissance "Attrait" d'un personnage à partir de ses
      * stats totales finales (base + niveau + éveil + équipement + bonus joueur).
      * Dérivé de la VRAIE formule de combat (dégâts, crit) plutôt que d'une
      * simple somme pondérée arbitraire, pour refléter la puissance réelle en

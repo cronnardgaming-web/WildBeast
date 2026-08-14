@@ -1,7 +1,7 @@
 /**
  * ============================================================
  * UI.JS — Interface utilisateur du jeu
- * Gère tous les écrans : Collection, Équipe, Gacha, Combat, Catalogue
+ * Gère tous les écrans : Collection, Préparation, Gacha, Combat, Catalogue
  * ============================================================
  */
 
@@ -43,9 +43,9 @@ const WBGameUI = (() => {
   const STAT_OPTIONS  = [
     { key: 'level', label: 'Niveau' },
     { key: 'hp',    label: 'PV' },
-    { key: 'atk',   label: 'Charisme' },
-    { key: 'def',   label: 'Prestance' },
-    { key: 'spd',   label: 'Grace' },
+    { key: 'atk',   label: 'Puissance' },
+    { key: 'def',   label: 'Résistance' },
+    { key: 'spd',   label: 'Agilité' },
   ];
 
   // Slots d'équipement : 3 emplacements fixes, dans l'ordre des index 0/1/2
@@ -134,10 +134,10 @@ const WBGameUI = (() => {
         <option value="rarity" ${current === 'rarity' ? 'selected' : ''}>Trier : Rareté</option>
         <option value="type"   ${current === 'type'   ? 'selected' : ''}>Trier : Type</option>
         <option value="hp"     ${current === 'hp'     ? 'selected' : ''}>Trier : PV</option>
-        <option value="atk"    ${current === 'atk'    ? 'selected' : ''}>Trier : Charisme</option>
-        <option value="def"    ${current === 'def'    ? 'selected' : ''}>Trier : Prestance</option>
-        <option value="spd"    ${current === 'spd'    ? 'selected' : ''}>Trier : Grace</option>
-        <option value="aura"   ${current === 'aura'   ? 'selected' : ''}>Trier : ✨ Aura</option>
+        <option value="atk"    ${current === 'atk'    ? 'selected' : ''}>Trier : Puissance</option>
+        <option value="def"    ${current === 'def'    ? 'selected' : ''}>Trier : Résistance</option>
+        <option value="spd"    ${current === 'spd'    ? 'selected' : ''}>Trier : Agilité</option>
+        <option value="aura"   ${current === 'aura'   ? 'selected' : ''}>Trier : ⭐ Attrait</option>
       </select>
     `;
   }
@@ -702,13 +702,13 @@ const WBGameUI = (() => {
     nav.className = 'app-nav-new';
     nav.innerHTML = `
       <div class="nav-new-btn active" data-screen="hub">
-        <span class="nav-ico">🏢</span><span class="nav-lbl">BUREAU</span>
+        <span class="nav-ico">🏕️</span><span class="nav-lbl">BASE</span>
       </div>
       <div class="nav-new-btn" data-screen="collection">
         <span class="nav-ico">✨</span><span class="nav-lbl">COLLECTION</span>
       </div>
       <div class="nav-new-btn" data-screen="team-hub">
-        <span class="nav-ico">👥</span><span class="nav-lbl">ÉQUIPE</span>
+        <span class="nav-ico">🎒</span><span class="nav-lbl">PRÉPARATION</span>
       </div>
       <div class="nav-combat-btn" id="nav-combat-btn">
         <span class="nav-badge" id="nav-combat-badge" style="display:none">!</span>
@@ -716,7 +716,7 @@ const WBGameUI = (() => {
         <span class="nav-lbl">COMBAT</span>
       </div>
       <div class="nav-new-btn" id="nav-gacha-btn" data-screen="gacha">
-        <span class="nav-ico">📜</span><span class="nav-lbl">CONTRAT</span>
+        <span class="nav-ico">🤝</span><span class="nav-lbl">SPONSORING</span>
       </div>
       <div class="nav-new-btn" data-screen="shop">
         <span class="nav-ico">🛍️</span><span class="nav-lbl">SHOP</span>
@@ -726,7 +726,7 @@ const WBGameUI = (() => {
       </div>
     `;
 
-    // Bouton Contrat (gacha) — verrouillé si feature pas débloquée
+    // Bouton Sponsoring (gacha) — verrouillé si feature pas débloquée
     const gachaBtn = document.getElementById('nav-gacha-btn');
     const gachaUnlocked = WBGameState.isFeatureUnlocked?.('gacha') ?? true;
     if (!gachaUnlocked && gachaBtn) {
@@ -735,7 +735,7 @@ const WBGameUI = (() => {
     }
     gachaBtn?.addEventListener('click', () => {
       if (!WBGameState.isFeatureUnlocked?.('gacha')) {
-        _showToast('🔒 Contrat disponible au Chapitre 2, Stage 5', 'info');
+        _showToast('🔒 Sponsoring disponible au Chapitre 2, Stage 5', 'info');
         return;
       }
       showScreen('gacha');
@@ -823,9 +823,9 @@ const WBGameUI = (() => {
       // Ordre de déblocage
       { id:'fullRandom',   icon:'🎲', name:'Battue',           desc:'Équipe aléatoire, ennemies aléatoires',               featured:false, unlocked:WBGameState.isFeatureUnlocked?.('caprice')   ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 2' },
       { id:'story',        icon:'🌍', name:'Expédition',       desc:'Progressez monde par monde',                          featured:false, unlocked:WBGameState.isFeatureUnlocked?.('tournee')   ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 3' },
-      { id:'byLine',       icon:'🎬', name:'Saga',             desc:'Affrontez toute une lignée',                          featured:false, unlocked:WBGameState.isFeatureUnlocked?.('saga')      ?? true, lockedDesc:'🔒 Disponible au Chapitre 3, Stage 5' },
+      { id:'byLine',       icon:'🐾', name:'Élevage',          desc:'Affrontez toute une lignée',                          featured:false, unlocked:WBGameState.isFeatureUnlocked?.('saga')      ?? true, lockedDesc:'🔒 Disponible au Chapitre 3, Stage 5' },
       { id:'arena',        icon:'🏆', name:'Grand Gala',       desc:'Mode compétitif',                                     featured:false, unlocked:WBGameState.isFeatureUnlocked?.('grandgala') ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 5' },
-      { id:'record',       icon:'📊', name:'Record',           desc:'Battez vos propres records',                          featured:false, unlocked:false, lockedDesc:'🔒 Bientôt disponible' },
+      { id:'record',       icon:'🏆', name:'Trophée',          desc:'Battez vos propres records',                          featured:false, unlocked:false, lockedDesc:'🔒 Bientôt disponible' },
       { id:'challenge',    icon:'🌀', name:'???',              desc:'Un nouveau défi vous attend...',                      featured:false, unlocked:false, lockedDesc:'🔒 Bientôt disponible' },
       // Événement — blingbling, pleine largeur
       { id:'event',        icon:'⭐', name:'Événement',        desc:'Des histoires exclusives aux créatures de l\'Event',   featured:false, unlocked:false, lockedDesc:'🔒 Bientôt disponible', eventFeatured:true },
@@ -1181,13 +1181,13 @@ const WBGameUI = (() => {
     const el = document.getElementById('screen-team-hub');
     if (!el) return;
     const items = [
-      { icon:'🎬', name:'Équipe',             desc:"Compose ton équipe de créatures pour partir au combat",                                    target:'team',  inactive:false },
-      { icon:'💍', name:'Parures',            desc:'Équipe tes créatures avec les meilleurs équipements',                          target:'equip', inactive:false },
+      { icon:'🎒', name:'Préparation',        desc:"Compose ton équipe de créatures pour partir au combat",                                    target:'team',  inactive:false },
+      { icon:'⚔️', name:'Équipements',        desc:'Équipe tes créatures avec les meilleurs équipements',                          target:'equip', inactive:false },
       { icon:'🧵', name:'Atelier de Couture', desc:'Fusionne des équipements pour en créer de plus puissants',                              target:null,    inactive:true  },
       { icon:'✒️', name:'Signature',          desc:'Fusionne des équipements Mythiques identiques pour les élever au rang absolu',          target:null,    inactive:true  },
     ];
     el.innerHTML = `<div class="team-hub-screen">
-      <div class="team-hub-title">👥 Gestion de l'Équipe</div>
+      <div class="team-hub-title">🎒 Préparation</div>
       <div class="team-hub-subtitle">Constitue ta troupe et habille-la pour la gloire</div>
       ${items.map(item => `
         <div class="team-hub-card${item.inactive?' inactive':''}" ${item.target?`data-target="${item.target}"`:''}>
@@ -1254,7 +1254,7 @@ const WBGameUI = (() => {
       ? Math.round((stats.totalVictories / stats.totalBattles) * 100) : 0;
     const ownedCount   = (player.collection || []).length;
     const galleryEntries = Object.keys(player.catalogue || {}).length;
-    const catalogueTotal = (state.characters||[]).length; // toutes formes confondues, comme la Galerie
+    const catalogueTotal = (state.characters||[]).length; // toutes formes confondues, comme l'Encyclopédie
     const tourneeWorld    = player.story?.world    || 1;
     const tourneeSubLevel = player.story?.subLevel || 0;
     const tourneePerWorld = cfg.combat?.story?.subLevelsPerWorld || 25;
@@ -1294,11 +1294,11 @@ const WBGameUI = (() => {
       { label: '💎 Invocations',        value: (stats.totalPulls||0).toLocaleString('fr-FR'),       highlight: false, progress: _progressBarHtml('pulls') },
       { label: '✨ Évolutions',         value: (stats.totalEvolutions||0).toLocaleString('fr-FR'), highlight: false, progress: _progressBarHtml('evolutions') },
       { label: '⭐ Éveils',             value: (stats.totalAwakenings||0).toLocaleString('fr-FR'), highlight: false, progress: _progressBarHtml('awakenings') },
-      { label: '🌸 Galerie',             value: `${galleryEntries} / ${catalogueTotal}`,             highlight: galleryEntries===catalogueTotal, progress: _progressBarHtml('galleryEntries') },
+      { label: '📚 Encyclopédie',        value: `${galleryEntries} / ${catalogueTotal}`,             highlight: galleryEntries===catalogueTotal, progress: _progressBarHtml('galleryEntries') },
       { label: '💵 $ gagnés',           value: (stats.totalGoldEarned||0).toLocaleString('fr-FR'), highlight: false, progress: _progressBarHtml('goldEarned') },
       { label: '💎 Diamants gagnés',    value: (stats.totalCrystalsEarned||0).toLocaleString('fr-FR'), highlight: false },
-      { label: '💫 Aura totale',        value: (WBGameState.getPlayerAuraScoreTotal?.()||0).toLocaleString('fr-FR'), highlight: true, progress: _progressBarHtml('scoreTotal') },
-      { label: '👑 Aura d\'équipe',     value: (WBGameState.getPlayerAuraScoreTeam?.()||0).toLocaleString('fr-FR'),  highlight: true, progress: _progressBarHtml('scoreTeam') },
+      { label: '⭐ Attrait total',       value: (WBGameState.getPlayerAuraScoreTotal?.()||0).toLocaleString('fr-FR'), highlight: true, progress: _progressBarHtml('scoreTotal') },
+      { label: '👑 Attrait d\'équipe',  value: (WBGameState.getPlayerAuraScoreTeam?.()||0).toLocaleString('fr-FR'),  highlight: true, progress: _progressBarHtml('scoreTeam') },
       { label: '🌍 Expédition',         value: `Monde ${tourneeWorld} — ${tourneeSubLevel}/${tourneePerWorld}`, highlight: true, progress: _progressBarHtml('tourneeProgress') },
     ];
     const statsEl = document.getElementById('pm-stats-grid');
@@ -1415,7 +1415,7 @@ const WBGameUI = (() => {
     const current = player.avatarCharId;
     const catalogue = player.catalogue || {};
 
-    // Tous les personnages découverts dans la galerie (toutes évolutions),
+    // Tous les personnages découverts dans l'encyclopédie (toutes évolutions),
     // triés comme le catalogue : par lignée puis par stade d'évolution
     const discovered = (state.characters || []).filter(def => catalogue[def.id]?.discovered);
 
@@ -1529,16 +1529,16 @@ Utilise les filtres et le tri en haut pour retrouver rapidement une créature.
 Les chiffres en surimpression indiquent le niveau d'Éveil (★) et le niveau actuel.`,
     },
     team: {
-      title: '👥 Mon Équipe',
+      title: '🎒 Ma Préparation',
       text: `Compose ton équipe de combat.<br>
 L'équipe est utilisée dans tous les modes sauf Battue (équipe aléatoire) et Combat Event (créatures du Tag uniquement).<br>
 L'ordre n'a pas d'importance — l'initiative dépend de la <b>Grâce</b> de chaque créature.<br><br>
-<b>Conseil</b> : équilibre Endurance (tank), Charisme (dégâts) et Grace (vitesse d'action).`,
+<b>Conseil</b> : équilibre Vitalité (tank), Puissance (dégâts) et Agilité (vitesse d'action).`,
     },
     combat: {
       title: '⚔️ Modes de Combat',
       text: `<b>🌍 Expédition</b> — Progression par monde. Clé pour la montée en niveau.<br>
-<b>🎬 Saga</b> — Affronte toute la lignée d'une créature (toutes ses évolutions).<br>
+<b>🐾 Élevage</b> — Affronte toute la lignée d'une créature (toutes ses évolutions).<br>
 <b>🎲 Battue</b> — Équipe aléatoire tirée de ta collection.<br>
 <b>🏛️ Arène</b> — Mode compétitif avec règles spéciales.<br>
 <b>✨ Battue Sauvage</b> — Équipe aléatoire, ennemies du Tag Event uniquement.<br>
@@ -1552,15 +1552,15 @@ L'ordre n'a pas d'importance — l'initiative dépend de la <b>Grâce</b> de cha
 La <b>Bannière Event</b> (si un Event est actif) propose uniquement des créatures du Tag avec des taux de rareté uniformes.`,
     },
     equip: {
-      title: '💍 Parures — Équipements',
+      title: '⚔️ Équipements',
       text: `Équipe tes créatures avec 3 emplacements : <b>Arme</b>, <b>Armure</b> et <b>Accessoire</b>.<br>
-Chaque parure booste Endurance, Charisme, Prestance et/ou Grace.<br>
-Les parures mythiques ont les meilleurs bonus.<br><br>
-Pour équiper : va dans <b>Ma Collection</b> → fiche d'une créature → onglet Parures.`,
+Chaque équipement booste Vitalité, Puissance, Résistance et/ou Agilité.<br>
+Les équipements mythiques ont les meilleurs bonus.<br><br>
+Pour équiper : va dans <b>Ma Collection</b> → fiche d'une créature → onglet Équipements.`,
     },
     inventory: {
       title: '🎒 Inventaire',
-      text: `Tes objets consommables et parures non équipées.<br><br>
+      text: `Tes objets consommables et équipements non équipés.<br><br>
 <b>💊 Pilule de Prestige</b> — Permet à une créature au niveau max de continuer à progresser (Éveil).<br>
 <b>🧪 Nectar du Désir</b> — Restaure de l'Énergie immédiatement.<br><br>
 Les objets s'utilisent depuis la fiche de la créature ou directement ici.`,
@@ -1573,7 +1573,7 @@ Les objets s'utilisent depuis la fiche de la créature ou directement ici.`,
 <b>Ligne 3 — Sélection du moment</b> : 9 articles renouvelés automatiquement chaque jour.`,
     },
     quests: {
-      title: '📅 Escapades',
+      title: '🧭 Missions',
       text: `<b>✨ Missions Event</b> (bloc violet) — Quêtes liées au Tag Event. Remises à zéro à chaque nouvel Event. Récompenses en Diamants.<br><br>
 <b>🗓️ Rituels Event</b> — Connexion quotidienne sur 10 jours. Le Jour 10 offre une créature <b>Épique</b> du Tag !<br><br>
 <b>📅 Rendez-vous du jour</b> — Quêtes quotidiennes classiques : vaincre, capturer, invoquer...`,
@@ -1696,7 +1696,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       <div class="card-portrait">
         ${_portraitImgHtml(def)}
         <div class="card-rarity-badge" style="background:${rarityDef.color || '#888'}">${rarityDef.name || def.rarity}</div>
-        ${opts.aura != null ? `<div class="card-aura-badge">💫 ${opts.aura.toLocaleString('fr-FR')}</div>` : ''}
+        ${opts.aura != null ? `<div class="card-aura-badge">⭐ ${opts.aura.toLocaleString('fr-FR')}</div>` : ''}
         ${opts.inTeam ? '<div class="in-team-badge">ÉQUIPE</div>' : ''}
       </div>
       <div class="card-info">
@@ -1711,10 +1711,10 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
           <div class="xp-bar-fill" style="width:${xpPct}%"></div>
         </div>
         <div class="card-stats-mini">
-          <span title="Endurance">💗 ${stats.hp}</span>
-          <span title="Charisme">✨ ${stats.atk}</span>
-          <span title="Prestance">🌹 ${stats.def}</span>
-          <span title="Grace">🕊️ ${stats.spd}</span>
+          <span title="Vitalité">💗 ${stats.hp}</span>
+          <span title="Puissance">💪 ${stats.atk}</span>
+          <span title="Résistance">🛡️ ${stats.def}</span>
+          <span title="Agilité">🐆 ${stats.spd}</span>
         </div>
       </div>
     </div>`;
@@ -1854,26 +1854,26 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
               ` : ''}
               ${_buildTypeAffinitiesHtml(def.type1, def.type2)}
               <div class="detail-level">Niveau <strong>${inst.level}</strong> — XP : ${inst.xp} / ${xpNeeded}</div>
-              <div class="detail-awakening">Sublimation : ${'★'.repeat(inst.awakening || 0)}</div>
+              <div class="detail-awakening">Renforcement : ${'★'.repeat(inst.awakening || 0)}</div>
               <div class="stat-grid">
                 <div class="stat-row stat-aura-row">
-                  <span>💫 Aura</span><strong>${WBGameDatabase.computeAuraScore(_fs.total, state.config.combat).toLocaleString('fr-FR')}</strong>
+                  <span>⭐ Attrait</span><strong>${WBGameDatabase.computeAuraScore(_fs.total, state.config.combat).toLocaleString('fr-FR')}</strong>
                 </div>
                 <div class="stat-row stat-clickable" onclick="WBGameUI._showStatDetail('${instanceId}','hp',event)">
-                  <span>💗 Endurance</span><strong>${_fs.total.hp}</strong><span class="stat-detail-hint">ℹ</span>
+                  <span>💗 Vitalité</span><strong>${_fs.total.hp}</strong><span class="stat-detail-hint">ℹ</span>
                 </div>
                 <div class="stat-row stat-clickable" onclick="WBGameUI._showStatDetail('${instanceId}','atk',event)">
-                  <span>✨ Charisme</span><strong>${_fs.total.atk}</strong><span class="stat-detail-hint">ℹ</span>
+                  <span>💪 Puissance</span><strong>${_fs.total.atk}</strong><span class="stat-detail-hint">ℹ</span>
                 </div>
                 <div class="stat-row stat-clickable" onclick="WBGameUI._showStatDetail('${instanceId}','def',event)">
-                  <span>🌹 Prestance</span><strong>${_fs.total.def}</strong><span class="stat-detail-hint">ℹ</span>
+                  <span>🛡️ Résistance</span><strong>${_fs.total.def}</strong><span class="stat-detail-hint">ℹ</span>
                 </div>
                 <div class="stat-row stat-clickable" onclick="WBGameUI._showStatDetail('${instanceId}','spd',event)">
-                  <span>🕊️ Grace</span><strong>${_fs.total.spd}</strong><span class="stat-detail-hint">ℹ</span>
+                  <span>🐆 Agilité</span><strong>${_fs.total.spd}</strong><span class="stat-detail-hint">ℹ</span>
                 </div>
               </div>
               <div class="detail-equip">
-                <h4>Parures</h4>
+                <h4>Équipements</h4>
                 <div class="equip-slots">
                   ${EQUIP_SLOT_ORDER.map((slotKey, slot) => {
                     const invId = inst.equipment[slot];
@@ -1966,17 +1966,17 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
               ` : ''}
               ${_buildTypeAffinitiesHtml(combatant.type1, combatant.type2)}
               <div class="detail-level">Niveau <strong>${combatant.level}</strong>${!combatant.alive ? ' — <strong style="color:var(--danger)">K.O.</strong>' : ''}</div>
-              <div class="detail-awakening">Sublimation : ${'★'.repeat(combatant.awakening || 0)}</div>
+              <div class="detail-awakening">Renforcement : ${'★'.repeat(combatant.awakening || 0)}</div>
               ${statusEntries.length > 0 ? `
                 <div class="detail-status-effects">
                   ${statusEntries.map(s => `<span class="status-badge-detail">${STATUS_LABELS[s.type] || s.type}</span>`).join('')}
                 </div>
               ` : ''}
               <div class="stat-grid">
-                <div class="stat-row"><span>💗 Endurance</span><strong>${combatant.currentHp} / ${combatant.maxHp}</strong></div>
-                <div class="stat-row"><span>✨ Charisme</span><strong>${combatant.atk}</strong></div>
-                <div class="stat-row"><span>🌹 Prestance</span><strong>${combatant.def}</strong></div>
-                <div class="stat-row"><span>🕊️ Grace</span><strong>${combatant.spd}</strong></div>
+                <div class="stat-row"><span>💗 Vitalité</span><strong>${combatant.currentHp} / ${combatant.maxHp}</strong></div>
+                <div class="stat-row"><span>💪 Puissance</span><strong>${combatant.atk}</strong></div>
+                <div class="stat-row"><span>🛡️ Résistance</span><strong>${combatant.def}</strong></div>
+                <div class="stat-row"><span>🐆 Agilité</span><strong>${combatant.spd}</strong></div>
               </div>
             </div>
           </div>
@@ -2149,7 +2149,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     if (!inst || !def) return;
 
     const _fs = _computeFullStats(inst, def);
-    const labels = { hp: '💗 Endurance', atk: '✨ Charisme', def: '🌹 Prestance', spd: '🕊️ Grace' };
+    const labels = { hp: '💗 Vitalité', atk: '💪 Puissance', def: '🛡️ Résistance', spd: '🐆 Agilité' };
 
     const base0         = def.baseStats[statKey];
     const baseWithLevel = _fs.base[statKey];
@@ -2180,12 +2180,12 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         </div>` : ''}
         ${awBonus > 0 ? `<div class="sdb-row">
           <span class="sdb-icon">⭐</span>
-          <span class="sdb-label">Sublimation ×${inst.awakening || 0}</span>
+          <span class="sdb-label">Renforcement ×${inst.awakening || 0}</span>
           <span class="sdb-value">+${awBonus}</span>
         </div>` : ''}
         ${eqBonus > 0 ? `<div class="sdb-row">
           <span class="sdb-icon">💍</span>
-          <span class="sdb-label">Parures équipées</span>
+          <span class="sdb-label">Équipements équipés</span>
           <span class="sdb-value">+${eqBonus}</span>
         </div>` : ''}
         ${pb > 0 ? `<div class="sdb-row sdb-player">
@@ -2256,7 +2256,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     const types  = state.types;
 
     el.innerHTML = `
-      <div class="screen-header"><h2>Mon Équipe <small>(${WBGameState.getTeam().length}/${cfg.game.maxTeamSize})</small></h2>${_helpBtn('team')}</div>
+      <div class="screen-header"><h2>Ma Préparation <small>(${WBGameState.getTeam().length}/${cfg.game.maxTeamSize})</small></h2>${_helpBtn('team')}</div>
       <div class="team-slots" id="team-slots">
         ${Array.from({length: cfg.game.maxTeamSize}, (_, i) => {
           const member = player.team[i] ? player.collection.find(c => c.instanceId === player.team[i]) : null;
@@ -2282,10 +2282,10 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
                     ${t2 ? `<span class="type-badge" style="background:${t2.color}">${t2.icon} ${t2.name}</span>` : ''}
                   </div>
                   <div class="team-stats-mini">
-                    <span title="Endurance">💗 ${stats.hp}</span>
-                    <span title="Charisme">✨ ${stats.atk}</span>
-                    <span title="Prestance">🌹 ${stats.def}</span>
-                    <span title="Grace">🕊️ ${stats.spd}</span>
+                    <span title="Vitalité">💗 ${stats.hp}</span>
+                    <span title="Puissance">💪 ${stats.atk}</span>
+                    <span title="Résistance">🛡️ ${stats.def}</span>
+                    <span title="Agilité">🐆 ${stats.spd}</span>
                   </div>
                 </div>
                 <button class="btn-remove-team" data-instance-id="${member.instanceId}">✕</button>
@@ -2322,7 +2322,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     });
   }
 
-  /** Rafraîchit la grille de sélection de personnages dans l'écran Équipe (triée + filtrée) */
+  /** Rafraîchit la grille de sélection de personnages dans l'écran Préparation (triée + filtrée) */
   function _refreshTeamCollectionGrid() {
     const state  = WBGameState.get();
     const player = WBGameState.getPlayer();
@@ -2377,7 +2377,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         🌍 Expédition <span class="energy-cost-badge">⚡${costs.story ?? 10}</span>
       </button>
       <button class="combat-mode-btn ${_combatMode === 'line' ? 'active' : ''}" data-mode="line">
-        🎬 Saga <span class="energy-cost-badge">⚡${costs.line ?? 20}</span>
+        🐾 Élevage <span class="energy-cost-badge">⚡${costs.line ?? 20}</span>
       </button>
       <button class="combat-mode-btn ${_combatMode === 'fullRandom' ? 'active' : ''}" data-mode="fullRandom">
         🎲 Battue <span class="energy-cost-badge">⚡${costs.fullRandom ?? 10}</span>
@@ -2416,7 +2416,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
           ${_combatMode === 'fullEvent' ? `<p class="combat-mode-note">✨ Combat ${WBGameState.get().tags?.find(t=>t.id===ev?.tagId)?.name || 'Event'} : alliées ET adversaires sont du tag ${WBGameState.get().tags?.find(t=>t.id===ev?.tagId)?.name || 'Event'} uniquement.</p>` : ''}
           <div class="lobby-team">
             ${team.length === 0
-              ? '<p class="empty-msg">Composez votre casting dans l\'onglet Équipe.</p>'
+              ? '<p class="empty-msg">Composez votre casting dans l\'onglet Préparation.</p>'
               : team.map(inst => {
                   const def   = WBGameState.getCharDef(inst.charId);
                   const stats = _computeFullStats(inst, def).total;
@@ -2819,7 +2819,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     lobby.style.display = 'none';
     battleArea.style.display = 'block';
 
-    // Pendant le combat : masquer les onglets de mode (Expédition/Saga/Battue/Arène/...)
+    // Pendant le combat : masquer les onglets de mode (Expédition/Élevage/Battue/Arène/...)
     // et le menu de navigation du bas, pour ne pas pouvoir quitter le combat.
     const tabsEl = document.querySelector('.combat-mode-tabs');
     if (tabsEl) tabsEl.style.display = 'none';
@@ -2951,7 +2951,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
 
     // Buff ATK temporaire (Ardente)
     if ((combatant.tempAtkBuffPercent || 0) > 0) {
-      icons.push(`<span class="status-icon status-buff" title="Charisme Up +${combatant.tempAtkBuffPercent}%">✨↑</span>`);
+      icons.push(`<span class="status-icon status-buff" title="Puissance Up +${combatant.tempAtkBuffPercent}%">✨↑</span>`);
     }
 
     return icons.join('');
@@ -4138,7 +4138,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       <div class="screen-header"><h2>💎 Rencontres</h2>${_helpBtn('gacha')}</div>
       <div class="gacha-tabs">
         <button class="gacha-tab ${_gachaTab === 'chars' ? 'active' : ''}" data-tab="chars">💎 Personnages</button>
-        <button class="gacha-tab ${_gachaTab === 'equip' ? 'active' : ''}" data-tab="equip">💍 Parures</button>
+        <button class="gacha-tab ${_gachaTab === 'equip' ? 'active' : ''}" data-tab="equip">⚔️ Équipements</button>
       </div>
       <div id="gacha-tab-content"></div>
       <div id="gacha-results"></div>
@@ -4266,7 +4266,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
                 </button>
               </div>
             </div>`).join('')}
-          ${equipBanners.length === 0 ? '<p class="empty-msg">Aucun défilé de parures actif.</p>' : ''}
+          ${equipBanners.length === 0 ? '<p class="empty-msg">Aucun défilé d\'équipements actif.</p>' : ''}
         </div>`;
       el.querySelectorAll('.btn-equip-pull').forEach(btn => {
         btn.addEventListener('click', () => _doEquipGachaPull(btn.dataset.banner, Number(btn.dataset.count)));
@@ -4384,9 +4384,9 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     // ── Construire le statut (nouveau / awakening / max) ────────────────────
     let statusHtml;
     if (result.awakeningMax) {
-      statusHtml = `<div class="gacha-status status-awk-max">★ SUBLIMATION MAX ★<br><small>💊 Élixir de Prestige !</small></div>`;
+      statusHtml = `<div class="gacha-status status-awk-max">★ RENFORCEMENT MAX ★<br><small>💊 Élixir de Prestige !</small></div>`;
     } else if (result.awakening) {
-      statusHtml = `<div class="gacha-status">✨ Sublimation +1</div>`;
+      statusHtml = `<div class="gacha-status">✨ Renforcement +1</div>`;
     } else if (result.isNew) {
       statusHtml = `<div class="gacha-status status-new">✦ NOUVEAU !</div>`;
     } else {
@@ -4477,7 +4477,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     el.dataset.built = '1';
 
     el.innerHTML = `
-      <div class="screen-header"><h2>💍 Parures</h2>${_helpBtn('equip')}</div>
+      <div class="screen-header"><h2>⚔️ Équipements</h2>${_helpBtn('equip')}</div>
 
       <div class="equip-top-zone">
         <div id="auto-equip-result"></div>
@@ -4508,7 +4508,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
 
       <!-- ── Inventaire équipements (zone basse, scrollable) ── -->
       <div class="equip-section" id="equip-inv-section">
-        <div class="equip-section-title">Parures en stock <span class="badge" id="equip-inv-count">${WBGameState.getPlayer().equipInventory?.length || 0}</span></div>
+        <div class="equip-section-title">Équipements en stock <span class="badge" id="equip-inv-count">${WBGameState.getPlayer().equipInventory?.length || 0}</span></div>
         ${_renderEquipInventorySection()}
       </div>
     `;
@@ -4531,7 +4531,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   }
 
   /**
-   * Génère la structure de la section "Parures en stock" : 3 onglets
+   * Génère la structure de la section "Équipements en stock" : 3 onglets
    * (Armes / Armures / Accessoires), chacun avec son propre tri et ses filtres.
    */
   function _renderEquipInventorySection() {
@@ -4544,7 +4544,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         `).join('')}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
-        <button id="btn-auto-equip" style="background:linear-gradient(135deg,var(--accent2),var(--accent2-deep));border:none;border-radius:999px;color:#fff;font-size:.74rem;font-weight:700;padding:7px 14px;cursor:pointer;white-space:nowrap">⚡ Parure auto</button>
+        <button id="btn-auto-equip" style="background:linear-gradient(135deg,var(--accent2),var(--accent2-deep));border:none;border-radius:999px;color:#fff;font-size:.74rem;font-weight:700;padding:7px 14px;cursor:pointer;white-space:nowrap">⚡ Équipement auto</button>
         <button id="btn-unequip-all" style="background:var(--danger);border:none;border-radius:999px;color:#fff;font-size:.74rem;font-weight:700;padding:7px 14px;cursor:pointer;white-space:nowrap">🗑️ Déséquiper tout</button>
       </div>
       <div class="screen-controls">
@@ -4563,7 +4563,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         const container = document.getElementById('equip-inv-section');
         if (container) {
           const badge = `<span class="badge" id="equip-inv-count">${WBGameState.getPlayer().equipInventory?.length || 0}</span>`;
-          container.innerHTML = `<div class="equip-section-title">Parures en stock ${badge}</div>${_renderEquipInventorySection()}`;
+          container.innerHTML = `<div class="equip-section-title">Équipements en stock ${badge}</div>${_renderEquipInventorySection()}`;
           _bindEquipInventorySection();
         }
       });
@@ -4628,7 +4628,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     const inv   = state.player.equipInventory || [];
 
     // 2. Classer les personnages (meilleurs en premier) : priorité à la rareté,
-    // puis au score Aura (départage à rareté égale)
+    // puis au score Attrait (départage à rareté égale)
     const RARITY_W = { mythic: 6, legendary: 5, epic: 4, rare: 3, uncommon: 2, common: 1 };
     const chars = [...state.player.collection].sort((a, b) => {
       const da = WBGameState.getCharDef(a.charId);
@@ -4692,7 +4692,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
 
     container.innerHTML = `
       <div class="auto-equip-summary">
-        <div class="auto-equip-summary-title">⚡ Parure automatique appliqué</div>
+        <div class="auto-equip-summary-title">⚡ Équipement automatique appliqué</div>
         ${_autoEquipResult.map(r => `
           <div class="auto-equip-summary-line">
             <strong>${r.charName}</strong> :
@@ -4827,7 +4827,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         <option value="hp"     ${current === 'hp'     ? 'selected' : ''}>Trier : PV</option>
         <option value="atk"    ${current === 'atk'    ? 'selected' : ''}>Trier : ATK</option>
         <option value="def"    ${current === 'def'    ? 'selected' : ''}>Trier : DEF</option>
-        <option value="spd"    ${current === 'spd'    ? 'selected' : ''}>Trier : Grace</option>
+        <option value="spd"    ${current === 'spd'    ? 'selected' : ''}>Trier : Agilité</option>
       </select>
     `;
   }
@@ -4915,7 +4915,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     const sorted   = _sortEquipInv(filtered, _equipInvSort[_equipInvTab]);
 
     if (sorted.length === 0) {
-      grid.innerHTML = `<p class="empty-msg" style="margin:0;padding:.8rem">${decoratedAll.length === 0 ? `Aucun ${EQUIP_SLOT_LABELS[_equipInvTab].replace(/^\S+\s/, '').toLowerCase()} en stock.<br>Utilisez le Défilé de Parures !` : 'Aucun parure ne correspond aux filtres.'}</p>`;
+      grid.innerHTML = `<p class="empty-msg" style="margin:0;padding:.8rem">${decoratedAll.length === 0 ? `Aucun ${EQUIP_SLOT_LABELS[_equipInvTab].replace(/^\S+\s/, '').toLowerCase()} en stock.<br>Utilisez le Défilé d'Équipements !` : 'Aucun équipement ne correspond aux filtres.'}</p>`;
       return;
     }
 
@@ -5544,7 +5544,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     }
 
     let label = '';
-    if (result.kind === 'character') label = result.result?.isNew ? 'Nouvelle créature obtenue !' : 'Sublimation +1 !';
+    if (result.kind === 'character') label = result.result?.isNew ? 'Nouvelle créature obtenue !' : 'Renforcement +1 !';
     else if (result.kind === 'equipment') label = 'Équipement obtenu !';
     else if (result.kind === 'item') label = 'Objet obtenu !';
     _showToast(`✅ ${label}`, 'success');
@@ -5589,9 +5589,9 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   let _leaderboardTab = 'aura_total'; // 'aura_total' | 'tournee_progress' | 'gallery_entries'
 
   const LEADERBOARD_TABS = [
-    { col: 'aura_total',       label: '💫 Aura',    unit: '💫' },
+    { col: 'aura_total',       label: '⭐ Attrait', unit: '⭐' },
     { col: 'tournee_progress', label: '🌍 Expédition', unit: '🌍 Niv.' },
-    { col: 'gallery_entries',  label: '📖 Galerie', unit: '📖' },
+    { col: 'gallery_entries',  label: '📚 Encyclopédie', unit: '📚' },
   ];
 
   function renderLeaderboard() {
@@ -5787,7 +5787,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       </div>` : '';
 
     el.innerHTML = `
-      <div class="screen-header"><h2>📅 Escapades</h2>${_helpBtn('quests')}</div>
+      <div class="screen-header"><h2>🧭 Missions</h2>${_helpBtn('quests')}</div>
       ${eventBlockHtml}
       ${cyclesHtml}
       <div class="equip-section-title" style="margin-top:${ev||activeCycles.length?'16px':'0'}">📅 Rendez-vous du jour</div>
