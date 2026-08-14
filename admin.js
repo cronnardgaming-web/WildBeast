@@ -5993,6 +5993,103 @@ const WBAdminPanel = (() => {
     `;
   }
 
+  // ─── TRADUCTION DU FORMAT database_export.json VERS LE FORMAT INTERNE ────────
+  // Le fichier database_export.json (structure "WildBeast" plus récente) utilise
+  // un schéma différent sur 3 points précis par rapport à ce que state.js/engine.js
+  // attendent. Cette fonction traduit l'un vers l'autre, sans toucher au moteur.
+
+  // Correspondance vérifiée 1:1 entre chaque passif "par type" du JSON
+  // (trigger/chance/value/value2) et le mécanisme effectType/params déjà
+  // implémenté dans engine.js. chance en JSON est une fraction (0.05 = 5%),
+  // le moteur attend un pourcentage (5) — d'où le ×100 partout ci-dessous.
+  const _WB_PASSIVE_EFFECT_MAP = {
+    fire:     { effectType: 'buff_ally_atk_once',        params: v => ({ chance: v.chance*100, percent: v.value }) },
+    nature:   { effectType: 'end_turn_heal_lowest_ally',  params: v => ({ chance: v.chance*100, healPercentMaxHp: v.value }) },
+    ice:      { effectType: 'stat_boost_crit_damage',     params: v => ({ percent: v.value }) },
+    water:    { effectType: 'end_turn_aoe_damage',        params: v => ({ chance: v.chance*100, damagePercentMaxHp: v.value }) },
+    metal:    { effectType: 'pre_attack_cleanse_self',    params: v => ({ chance: v.chance*100 }) },
+    electric: { effectType: 'on_hit_paralyze',            params: v => ({ chance: v.chance*100 }) },
+    shadow:   { effectType: 'stat_boost_evasion',         params: v => ({ percent: v.value }) },
+    chaos:    { effectType: 'on_hit_poison',              params: v => ({ chance: v.chance*100, damagePercentMaxHp: v.value, duration: v.value2 }) },
+    light:    { effectType: 'on_damaged_counter',         params: v => ({ chance: v.chance*100 }) },
+    magic:    { effectType: 'on_hit_charm',                params: v => ({ chance: v.chance*100 }) },
+    Cryptide: { effectType: 'random_passive_steal',       params: () => ({}) },
+  };
+
+  /** Construit { types, passives } au format interne à partir de config.passives + types du JSON */
+  function _wbTranslatePassives(jsonTypes, configPassives) {
+    if (!configPassives) return { types: jsonTypes, passives: null };
+    const passives = [];
+    const types = jsonTypes.map(t => {
+      const src = configPassives[t.id];
+      const map = _WB_PASSIVE_EFFECT_MAP[t.id];
+      if (!src || !map) return { ...t, passiveId: t.passiveId || null };
+      const passiveId = `passive_${t.id}`;
+      passives.push({ id: passiveId, name: src.name, description: src.description, effectType: map.effectType, params: map.params(src) });
+      return { ...t, passiveId };
+    });
+    return { types, passives };
+  }
+
+  /** Aplati tagCategories[].tags[{id,label}] (format JSON) en liste DEFAULT_TAGS à plat */
+  function _wbTranslateTags(tagCategories) {
+    if (!Array.isArray(tagCategories) || !tagCategories[0]?.tags) return null; // déjà au format à plat, rien à faire
+    const palette = ['#FF8A3D', '#2FB4C7', '#3E9B5C', '#F0D5A0', '#E85A3D'];
+    const tags = [];
+    const categories = tagCategories.map((cat, i) => {
+      tags.push(...cat.tags.map(tg => ({ id: tg.id, name: tg.label, color: palette[i % palette.length], categoryId: cat.id })));
+      return { id: cat.id, name: cat.name, icon: '🏷️', color: palette[i % palette.length] };
+    });
+    return { categories, tags };
+  }
+
+  /** Renomme shopItems (JSON) → shopListings (interne). Le champ 'limit' est conservé mais pas encore exploité par le jeu. */
+  function _wbTranslateShop(shopItems) {
+    if (!Array.isArray(shopItems)) return null;
+    return shopItems.map(s => ({ id: s.id, kind: s.category, refId: s.refId, price: s.price, currency: s.currency, enabled: s.active, limit: s.limit }));
+  }
+
+  /**
+   * Convertit loginCycles (JSON, récompenses multi-ressources par jour, sans
+   * limite de nombre) vers dailyLoginCycles (interne, jusqu'à 2 récompenses
+   * par jour via reward/reward2 — plafond de l'éditeur admin actuel). Priorité
+   * si plus de 2 ressources le même jour : cristaux > or > objets (le 1er objet
+   * seulement ; les objets suivants du même jour seraient perdus — cas rare).
+   */
+  function _wbTranslateLoginCycles(loginCycles) {
+    if (!Array.isArray(loginCycles)) return null;
+    return loginCycles.map(cycle => ({
+      id: cycle.id, name: cycle.name, length: cycle.days?.length || 0, loop: true, enabled: cycle.active !== false,
+      rewards: (cycle.days || []).map((d, i) => {
+        const r = d.reward || {};
+        const itemEntries = Object.entries(r.items || {});
+        const parts = [];
+        if (r.crystals > 0) parts.push({ type: 'crystals', amount: r.crystals });
+        if (r.gold > 0)     parts.push({ type: 'gold', amount: r.gold });
+        if (itemEntries.length) parts.push({ type: 'item', amount: itemEntries[0][1], refId: itemEntries[0][0] });
+        return { day: i + 1, reward: parts[0] || { type: 'gold', amount: 0 }, reward2: parts[1] || null };
+      }),
+    }));
+  }
+
+  /** Point d'entrée : transforme un export database_export.json complet vers le format interne */
+  function _wbTranslateImportedDatabase(data) {
+    const out = { ...data };
+    const { types, passives } = _wbTranslatePassives(data.types || [], data.config?.passives);
+    if (passives) { out.types = types; out.passives = passives; }
+
+    const tagResult = _wbTranslateTags(data.tagCategories);
+    if (tagResult) { out.tagCategories = tagResult.categories; out.tags = tagResult.tags; }
+
+    const shop = _wbTranslateShop(data.shopItems);
+    if (shop) { out.shopListings = shop; delete out.shopItems; }
+
+    const cycles = _wbTranslateLoginCycles(data.loginCycles);
+    if (cycles) { out.dailyLoginCycles = cycles; delete out.loginCycles; }
+
+    return out;
+  }
+
   /** Lit le fichier JSON choisi, scinde structurel/joueur, envoie vers Supabase */
   async function _runCloudImport() {
     const fileInput  = document.getElementById('cloud-import-file');
@@ -6007,7 +6104,7 @@ const WBAdminPanel = (() => {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      const { player, version, exportDate, timestamp, ...structural } = data;
+      const { player, version, exportDate, timestamp, ...structural } = _wbTranslateImportedDatabase(data);
 
       statusEl.innerHTML = '⏳ Envoi des données de jeu vers Supabase...';
       await WBBackend.saveGameData(structural);

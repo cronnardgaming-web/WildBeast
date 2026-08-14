@@ -5563,6 +5563,9 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   /** Formate une récompense générique en texte lisible (ou compact, pour les petites puces) */
   function _formatRewardLabel(reward, state, compact = false) {
     if (!reward) return '?';
+    if (Array.isArray(reward)) {
+      return reward.map(r => _formatRewardLabel(r, state, compact)).join(compact ? ' ' : ' + ');
+    }
     if (reward.type === 'gold') return `${reward.amount} 💵`;
     if (reward.type === 'crystals') return `${reward.amount} 💎`;
     if (reward.type === 'item') {
@@ -5697,7 +5700,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
           return `
             <div class="login-day-chip ${isCurrent?'current':''} ${isDone?'done':''} ${isLocked?'locked':''}">
               <div class="login-day-num">J${day}</div>
-              <div class="login-day-reward">${entry ? _formatRewardLabel(entry.reward, state, true) : '—'}</div>
+              <div class="login-day-reward">${entry ? _formatRewardLabel([entry.reward, entry.reward2].filter(Boolean), state, true) : '—'}</div>
               ${isDone ? '<div class="login-day-check">✓</div>' : ''}
               ${isLocked ? '<div class="login-day-lock">🔒</div>' : ''}
             </div>`;
@@ -5767,7 +5770,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
             const isLocked  = !isDone && !isCurrent;
             return `<div class="login-day-chip ${isCurrent?'current':''} ${isDone?'done':''} ${isLocked?'locked':''}">
               <div class="login-day-num">J${day}</div>
-              <div class="login-day-reward">${entry ? _formatRewardLabel(entry.reward, state, true) : '—'}</div>
+              <div class="login-day-reward">${entry ? _formatRewardLabel([entry.reward, entry.reward2].filter(Boolean), state, true) : '—'}</div>
               ${isDone ? '<div class="login-day-check">✓</div>' : ''}
               ${isLocked ? '<div class="login-day-lock">🔒</div>' : ''}
             </div>`;
@@ -5884,7 +5887,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       return `
         <div class="login-day-chip ${status}">
           <div class="login-day-num">J${day}</div>
-          <div class="login-day-reward">${entry ? _formatRewardLabel(entry.reward, state, true) : '—'}</div>
+          <div class="login-day-reward">${entry ? _formatRewardLabel([entry.reward, entry.reward2].filter(Boolean), state, true) : '—'}</div>
           ${status === 'done' ? '<div class="login-day-check">✓</div>' : ''}
           ${status === 'locked' ? '<div class="login-day-lock">🔒</div>' : ''}
         </div>

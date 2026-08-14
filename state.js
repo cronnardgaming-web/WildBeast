@@ -885,6 +885,7 @@ const WBGameState = (() => {
   // Forme : { type:'gold'|'crystals'|'item'|'equipment'|'character', amount, refId? }
 
   function _grantReward(reward) {
+    if (Array.isArray(reward)) { reward.forEach(r => _grantReward(r)); return; }
     if (!reward || !reward.type) return;
     const amount = Math.max(1, reward.amount || 1);
 
@@ -1491,7 +1492,7 @@ const WBGameState = (() => {
     if (prog.lastClaimDate === today) return { success: false, reason: 'already_claimed' };
 
     const dayEntry = (cycle.rewards || []).find(r => r.day === prog.currentDay);
-    if (dayEntry?.reward) _grantReward(dayEntry.reward);
+    if (dayEntry) _grantReward([dayEntry.reward, dayEntry.reward2].filter(Boolean));
 
     const claimedDay = prog.currentDay;
     prog.lastClaimDate = today;
