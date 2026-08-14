@@ -5614,7 +5614,7 @@ const WBAdminPanel = (() => {
 
   function _renderStoryTab() {
     const state    = WBGameState.get();
-    const sm       = state.config.storyMode || _defaultStoryMode();
+    const sm       = (state.config.storyMode?.chapters?.length ? state.config.storyMode : _defaultStoryMode());
     const chapters = sm.chapters || [];
 
     // Config par défaut des stages pour un chapitre donné
@@ -5765,7 +5765,7 @@ const WBAdminPanel = (() => {
   function _addStoryChapter() {
     _saveStoryMode(true);
     const state = WBGameState.get();
-    if (!state.config.storyMode) state.config.storyMode = _defaultStoryMode();
+    if (!state.config.storyMode?.chapters) state.config.storyMode = _defaultStoryMode();
     const ci = state.config.storyMode.chapters.length + 1;
     state.config.storyMode.chapters.push({ title:`Chapitre ${ci}`, synopsis:'', difficultyNote:'', dialogues:{1:{},5:{},8:{},10:{}} });
     WBGameState.updateConfig({ storyMode: state.config.storyMode });
@@ -5776,6 +5776,7 @@ const WBAdminPanel = (() => {
     if (!confirm(`Supprimer le chapitre ${ci+1} ?`)) return;
     _saveStoryMode(true);
     const state = WBGameState.get();
+    if (!state.config.storyMode?.chapters) return;
     state.config.storyMode.chapters.splice(ci, 1);
     WBGameState.updateConfig({ storyMode: state.config.storyMode });
     switchTab('story');
@@ -5783,7 +5784,7 @@ const WBAdminPanel = (() => {
 
   function _saveStoryMode(silent) {
     const state = WBGameState.get();
-    if (!state.config.storyMode) state.config.storyMode = _defaultStoryMode();
+    if (!state.config.storyMode?.chapters) state.config.storyMode = _defaultStoryMode();
     const sm = state.config.storyMode;
 
     sm.chapters.forEach((ch, ci) => {
