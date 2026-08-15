@@ -25,7 +25,7 @@ const WBGameDatabase = (() => {
       captureBaseRate: 0.15,                  // Taux de capture de base
       rewardXpPerEnemy: 20,                   // XP gagnée par ennemi vaincu (× son niveau)
       rewardGoldPerEnemy: 5,                  // Pièces d'or gagnées par ennemi vaincu
-      rewardDiamondsPerEnemy: 10,             // Diamants (cristaux) gagnés par ennemi vaincu
+      rewardDiamondsPerEnemy: 10,             // Essence Sauvage gagnée par ennemi vaincu
       speedEvasionCap: 0.10,                  // Max 10% d'écart sur esquive via vitesse
       speedAccuracyCap: 0.10,
       // ── Coups critiques ────────────────────────────────────────────────────
@@ -137,7 +137,7 @@ const WBGameDatabase = (() => {
       catalogue: null, 'story-chapters': null, 'story-chapter': null,
     },
     gacha: {
-      currencyName: "Diamants",
+      currencyName: "Essence Sauvage",
       singlePullCost: 100,
       tenPullCost: 900,
       guaranteedRareAfter: 10,
@@ -826,7 +826,7 @@ const WBGameDatabase = (() => {
   // { type:'gold'|'crystals'|'item'|'equipment'|'character', amount, refId? }
   const DEFAULT_DAILY_LOGIN_CYCLES = [
     { id: "CyclePièces", name: "Cycle Or", length: 7, loop: true, enabled: true, rewards: [{ day: 1, reward: { type: "gold", amount: 100 } }, { day: 2, reward: { type: "gold", amount: 200 } }, { day: 3, reward: { type: "gold", amount: 300 } }, { day: 4, reward: { type: "gold", amount: 400 } }, { day: 5, reward: { type: "gold", amount: 500 } }, { day: 6, reward: { type: "gold", amount: 600 } }, { day: 7, reward: { type: "gold", amount: 700 } }] },
-    { id: "Cycle Diamants", name: "Cycle Diamants", length: 7, loop: true, enabled: true, rewards: [{ day: 1, reward: { type: "crystals", amount: 20 } }, { day: 2, reward: { type: "crystals", amount: 40 } }, { day: 3, reward: { type: "crystals", amount: 60 } }, { day: 4, reward: { type: "crystals", amount: 80 } }, { day: 5, reward: { type: "crystals", amount: 100 } }, { day: 6, reward: { type: "crystals", amount: 120 } }, { day: 7, reward: { type: "crystals", amount: 150 } }] },
+    { id: "Cycle Diamants", name: "Cycle Essence Sauvage", length: 7, loop: true, enabled: true, rewards: [{ day: 1, reward: { type: "crystals", amount: 20 } }, { day: 2, reward: { type: "crystals", amount: 40 } }, { day: 3, reward: { type: "crystals", amount: 60 } }, { day: 4, reward: { type: "crystals", amount: 80 } }, { day: 5, reward: { type: "crystals", amount: 100 } }, { day: 6, reward: { type: "crystals", amount: 120 } }, { day: 7, reward: { type: "crystals", amount: 150 } }] },
     { id: "Cycle Cadeaux", name: "Cycle Cadeaux", length: 5, loop: true, enabled: true, rewards: [{ day: 1, reward: { type: "item", amount: 1, refId: "item_energy_potion" } }, { day: 2, reward: { type: "item", amount: 1, refId: "item_energy_potion" } }, { day: 3, reward: { type: "item", amount: 1, refId: "item_energy_potion" } }, { day: 4, reward: { type: "item", amount: 2, refId: "item_energy_potion" } }, { day: 5, reward: { type: "item", amount: 1, refId: "item_power_pill" } }] },
   ];
 

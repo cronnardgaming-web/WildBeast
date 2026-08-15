@@ -316,7 +316,7 @@ const WBGameUI = (() => {
       if (s.type === 'currency') {
         const cr = s.crystals ?? 500, go = s.gold ?? 500;
         if (rewWrap) { rewWrap.style.display = 'block'; rewWrap.innerHTML =
-          (cr > 0 ? `<div class="tuto-reward-card"><span class="tuto-reward-icon">💎</span><div><div class="tuto-reward-label">+${cr} Diamants</div></div></div>` : '') +
+          (cr > 0 ? `<div class="tuto-reward-card"><span class="tuto-reward-icon">💧</span><div><div class="tuto-reward-label">+${cr} Essence Sauvage</div></div></div>` : '') +
           (go > 0 ? `<div class="tuto-reward-card"><span class="tuto-reward-icon">💵</span><div><div class="tuto-reward-label">+${go} Dollars</div></div></div>` : ''); }
       }
       if (s.type === 'reward') {
@@ -953,7 +953,7 @@ const WBGameUI = (() => {
 
     hud.innerHTML = `
       <div class="hud-item">
-        <span class="hud-icon">💎</span>
+        <span class="hud-icon">💧</span>
         <span class="hud-val">${player.currency.crystals.toLocaleString()}</span>
       </div>
       <div class="hud-item">
@@ -1290,12 +1290,12 @@ const WBGameUI = (() => {
       { label: '🔥 Meilleure série',    value: (stats.longestWinStreak||0).toLocaleString('fr-FR'), highlight: true  },
       { label: '💥 Ennemis vaincus',   value: (stats.totalKills||0).toLocaleString('fr-FR'),       highlight: false, progress: _progressBarHtml('kills') },
       { label: '🎭 Captures',           value: (stats.totalCaptures||0).toLocaleString('fr-FR'),    highlight: false, progress: _progressBarHtml('captures') },
-      { label: '💎 Invocations',        value: (stats.totalPulls||0).toLocaleString('fr-FR'),       highlight: false, progress: _progressBarHtml('pulls') },
+      { label: '💧 Invocations',        value: (stats.totalPulls||0).toLocaleString('fr-FR'),       highlight: false, progress: _progressBarHtml('pulls') },
       { label: '✨ Évolutions',         value: (stats.totalEvolutions||0).toLocaleString('fr-FR'), highlight: false, progress: _progressBarHtml('evolutions') },
       { label: '⭐ Éveils',             value: (stats.totalAwakenings||0).toLocaleString('fr-FR'), highlight: false, progress: _progressBarHtml('awakenings') },
       { label: '📚 Encyclopédie',        value: `${galleryEntries} / ${catalogueTotal}`,             highlight: galleryEntries===catalogueTotal, progress: _progressBarHtml('galleryEntries') },
       { label: '💵 $ gagnés',           value: (stats.totalGoldEarned||0).toLocaleString('fr-FR'), highlight: false, progress: _progressBarHtml('goldEarned') },
-      { label: '💎 Diamants gagnés',    value: (stats.totalCrystalsEarned||0).toLocaleString('fr-FR'), highlight: false },
+      { label: '💧 Essence Sauvage gagnée', value: (stats.totalCrystalsEarned||0).toLocaleString('fr-FR'), highlight: false },
       { label: '⭐ Attrait total',       value: (WBGameState.getPlayerAuraScoreTotal?.()||0).toLocaleString('fr-FR'), highlight: true, progress: _progressBarHtml('scoreTotal') },
       { label: '👑 Attrait d\'équipe',  value: (WBGameState.getPlayerAuraScoreTeam?.()||0).toLocaleString('fr-FR'),  highlight: true, progress: _progressBarHtml('scoreTeam') },
       { label: '🌍 Expédition',         value: `Monde ${tourneeWorld} — ${tourneeSubLevel}/${tourneePerWorld}`, highlight: true, progress: _progressBarHtml('tourneeProgress') },
@@ -1544,9 +1544,9 @@ L'ordre n'a pas d'importance — l'initiative dépend de la <b>Grâce</b> de cha
 <b>✨ Combat [Tag]</b> — Alliées ET ennemies du Tag Event uniquement. Récompenses bonifiées.`,
     },
     gacha: {
-      title: '💎 Conquêtes — Invocations',
-      text: `Dépense des Diamants pour rencontrer de nouvelles créatures.<br>
-<b>×1</b> = 100 💎 &nbsp;|&nbsp; <b>×10</b> = 900 💎 (10% de réduction).<br><br>
+      title: '💧 Conquêtes — Invocations',
+      text: `Dépense de l'Essence Sauvage pour rencontrer de nouvelles créatures.<br>
+<b>×1</b> = 100 💧 &nbsp;|&nbsp; <b>×10</b> = 900 💧 (10% de réduction).<br><br>
 <b>Pitié</b> : Rare garantie toutes les 10, Épique toutes les 50, Légendaire toutes les 100 invocations.<br><br>
 La <b>Bannière Event</b> (si un Event est actif) propose uniquement des créatures du Tag avec des taux de rareté uniformes.`,
     },
@@ -1573,7 +1573,7 @@ Les objets s'utilisent depuis la fiche de la créature ou directement ici.`,
     },
     quests: {
       title: '🧭 Missions',
-      text: `<b>✨ Missions Event</b> (bloc violet) — Quêtes liées au Tag Event. Remises à zéro à chaque nouvel Event. Récompenses en Diamants.<br><br>
+      text: `<b>✨ Missions Event</b> (bloc violet) — Quêtes liées au Tag Event. Remises à zéro à chaque nouvel Event. Récompenses en Essence Sauvage.<br><br>
 <b>🗓️ Rituels Event</b> — Connexion quotidienne sur 10 jours. Le Jour 10 offre une créature <b>Épique</b> du Tag !<br><br>
 <b>📅 Rendez-vous du jour</b> — Quêtes quotidiennes classiques : vaincre, capturer, invoquer...`,
     },
@@ -2671,13 +2671,13 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       if (!done && !active) cls += ' story-locked';
 
       const rewardBadge = isBoss
-        ? `<div class="story-sub-reward story-sub-reward-boss">+${rewardBoss} 💎</div>`
+        ? `<div class="story-sub-reward story-sub-reward-boss">+${rewardBoss} 💧</div>`
         : isElite
           ? `<div class="story-sub-reward story-sub-reward-elite">+${rewardElite} 💵</div>`
           : '';
 
       return `
-        <div class="${cls}" title="Sanctuaire ${world} — Rendez-vous ${sub}${isElite ? ` (+${rewardElite} 💵)` : ''}${isBoss ? ` (+${rewardBoss} 💎)` : ''}">
+        <div class="${cls}" title="Sanctuaire ${world} — Rendez-vous ${sub}${isElite ? ` (+${rewardElite} 💵)` : ''}${isBoss ? ` (+${rewardBoss} 💧)` : ''}">
           <div class="story-sub-number">${world}-${sub}</div>
           ${label ? `<div class="story-sub-badge">${label}</div>` : ''}
           ${rewardBadge}
@@ -3980,13 +3980,13 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
           <div class="bro-rewards">
             <span>+${data.rewards.xpEarned} <small>XP</small></span>
             <span>+${data.rewards.gold} 💵</span>
-            <span>+${data.rewards.diamonds} 💎</span>
+            <span>+${data.rewards.diamonds} 💧</span>
             ${data.rewards.energyPotionsDropped > 0 ? `<span>+${data.rewards.energyPotionsDropped} 🧪</span>` : ''}
           </div>
           ${data.rewards.eliteBonusGold > 0 ? `
             <div class="bro-bonus-badge bro-bonus-elite">⚔️ Bonus Élite +${data.rewards.eliteBonusGold} 💵</div>` : ''}
           ${data.rewards.bossBonusDiamonds > 0 ? `
-            <div class="bro-bonus-badge bro-bonus-boss">👑 Bonus Boss +${data.rewards.bossBonusDiamonds} 💎</div>` : ''}
+            <div class="bro-bonus-badge bro-bonus-boss">👑 Bonus Boss +${data.rewards.bossBonusDiamonds} 💧</div>` : ''}
         ` : ''}
         ${levelUpHtml}
         ${captureHtml}
@@ -4188,9 +4188,9 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     const state = WBGameState.get();
 
     el.innerHTML = `
-      <div class="screen-header"><h2>💎 Rencontres</h2>${_helpBtn('gacha')}</div>
+      <div class="screen-header"><h2>💧 Rencontres</h2>${_helpBtn('gacha')}</div>
       <div class="gacha-tabs">
-        <button class="gacha-tab ${_gachaTab === 'chars' ? 'active' : ''}" data-tab="chars">💎 Personnages</button>
+        <button class="gacha-tab ${_gachaTab === 'chars' ? 'active' : ''}" data-tab="chars">💧 Personnages</button>
         <button class="gacha-tab ${_gachaTab === 'equip' ? 'active' : ''}" data-tab="equip">⚔️ Équipements</button>
       </div>
       <div id="gacha-tab-content"></div>
@@ -4266,18 +4266,18 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
           </div>
           <div class="banner-actions">
             <button class="btn-gacha btn-single btn-gacha-event" data-banner="banner_event">
-              ✦ Rencontrer ×1<br><small>${cfg.singlePullCost} 💎</small>
+              ✦ Rencontrer ×1<br><small>${cfg.singlePullCost} 💧</small>
             </button>
             <button class="btn-gacha btn-ten btn-gacha-event" data-banner="banner_event">
-              ✦✦ Rencontrer ×10<br><small>${cfg.tenPullCost} 💎</small>
+              ✦✦ Rencontrer ×10<br><small>${cfg.tenPullCost} 💧</small>
             </button>
           </div>
         </div>` : '';
 
       el.innerHTML = `
         <div class="gacha-currency">
-          <span class="hud-icon">💎</span>
-          <span>${state.player.currency.crystals.toLocaleString()} Diamants</span>
+          <span class="hud-icon">💧</span>
+          <span>${state.player.currency.crystals.toLocaleString()} Essence Sauvage</span>
         </div>
         <div class="banner-list">
           ${eventBannerHtml}
@@ -4287,10 +4287,10 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
               <div class="banner-header"><h3>${b.name}</h3><p>${b.description}</p></div>
               <div class="banner-actions">
                 <button class="btn-gacha btn-single" data-banner="${b.id}">
-                  ✦ Rencontrer ×1<br><small>${cfg.singlePullCost} 💎</small>
+                  ✦ Rencontrer ×1<br><small>${cfg.singlePullCost} 💧</small>
                 </button>
                 <button class="btn-gacha btn-ten" data-banner="${b.id}">
-                  ✦✦ Rencontrer ×10<br><small>${cfg.tenPullCost} 💎</small>
+                  ✦✦ Rencontrer ×10<br><small>${cfg.tenPullCost} 💧</small>
                 </button>
               </div>
             </div>`).join('')}
@@ -5491,7 +5491,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       const ref = resolveRef(l);
       if (!ref) return '';
       const priceToUse   = overridePrice ?? l.price;
-      const currencyIcon = l.currency === 'crystals' ? '💎' : '💵';
+      const currencyIcon = l.currency === 'crystals' ? '💧' : '💵';
       const balance      = player.currency[l.currency === 'crystals' ? 'crystals' : 'gold'] || 0;
       const canAfford    = balance >= priceToUse;
       const rarityDef    = l.kind !== 'item' ? (WBGameDatabase.RARITIES[ref.rarity] || {}) : {};
@@ -5620,7 +5620,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       return reward.map(r => _formatRewardLabel(r, state, compact)).join(compact ? ' ' : ' + ');
     }
     if (reward.type === 'gold') return `${reward.amount} 💵`;
-    if (reward.type === 'crystals') return `${reward.amount} 💎`;
+    if (reward.type === 'crystals') return `${reward.amount} 💧`;
     if (reward.type === 'item') {
       const def = state.items.find(i => i.id === reward.refId);
       return compact ? `${def?.icon || '🎒'}×${reward.amount}` : `${def?.name || 'Objet'} ×${reward.amount}`;
@@ -5721,7 +5721,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
           event_win_caprice:  `🌟 Réussir ${q.target} Battue Sauvage`,
           event_win_tag:      `✨ Réussir ${q.target} combats ${tag?.name || 'Event'}`,
           event_win_with_tag: `🏅 Finir ${q.target} combats avec un perso ${tag?.name || 'Event'} vivant`,
-          event_summon:       `💎 Rencontrer ${q.target} personnages sur la bannière ${tag?.name || 'Event'}`,
+          event_summon:       `💧 Rencontrer ${q.target} personnages sur la bannière ${tag?.name || 'Event'}`,
         }[q.type] || q.type;
 
         return `

@@ -42,7 +42,7 @@ const WBAdminPanel = (() => {
     { id: 'combat',     label: '⚔️ Combat',       group: 'Mécanique'  },
     // ── Système ──────────────────────────────────────────────────────────────
     { id: 'player',     label: '🎮 Joueur',      group: 'Système'    },
-    { id: 'resources',  label: '💎 Ressources',  group: 'Système'    },
+    { id: 'resources',  label: '💧 Ressources',  group: 'Système'    },
     { id: 'audio',      label: '🎵 Audio',        group: 'Système'    },
     { id: 'backgrounds',label: '🖼️ Fonds d\'écran', group: 'Système'  },
     { id: 'cloud-import',label: '📥 Import vers Supabase', group: 'Système' },
@@ -2262,7 +2262,7 @@ const WBAdminPanel = (() => {
             ${SHOP_KIND_LABELS[l.kind] || l.kind} — ${resolveRefName(l)}
             ${l.enabled === false ? '<span class="badge" style="background:#555;color:#ccc;">Désactivé</span>' : ''}
           </div>
-          <div class="admin-list-item-sub">Prix : ${l.price} ${l.currency === 'crystals' ? '💎' : '💵'} | ID article : ${l.id}</div>
+          <div class="admin-list-item-sub">Prix : ${l.price} ${l.currency === 'crystals' ? '💧' : '💵'} | ID article : ${l.id}</div>
         </div>
         <div class="admin-list-item-actions">
           <button class="admin-btn admin-btn-primary admin-btn-sm" onclick="WBAdminPanel._editShopListing('${l.id}')">✏️</button>
@@ -2296,7 +2296,7 @@ const WBAdminPanel = (() => {
             <label>Devise</label>
             <select id="shop-currency">
               <option value="gold">💵 Dollars</option>
-              <option value="crystals">💎 Diamants</option>
+              <option value="crystals">💧 Essence Sauvage</option>
             </select>
           </div>
           <div class="admin-field">
@@ -2464,7 +2464,7 @@ const WBAdminPanel = (() => {
       <div class="reward-editor" data-prefix="${prefix}">
         <select class="reward-type-select" id="${prefix}-type" onchange="WBAdminPanel._updateRewardRefVisibility('${prefix}')">
           <option value="gold"      ${reward.type === 'gold'      ? 'selected' : ''}>💵 Or</option>
-          <option value="crystals"  ${reward.type === 'crystals'  ? 'selected' : ''}>💎 Diamants</option>
+          <option value="crystals"  ${reward.type === 'crystals'  ? 'selected' : ''}>💧 Essence Sauvage</option>
           <option value="item"      ${reward.type === 'item'      ? 'selected' : ''}>🎒 Objet</option>
           <option value="equipment" ${reward.type === 'equipment' ? 'selected' : ''}>⚔️ Équipement</option>
           <option value="character" ${reward.type === 'character' ? 'selected' : ''}>🧝 Créature</option>
@@ -2503,7 +2503,7 @@ const WBAdminPanel = (() => {
   function _summarizeReward(reward, state) {
     if (!reward) return '?';
     if (reward.type === 'gold') return `💵 ${reward.amount}`;
-    if (reward.type === 'crystals') return `💎 ${reward.amount}`;
+    if (reward.type === 'crystals') return `💧 ${reward.amount}`;
     if (reward.type === 'item') return `🎒 ${state.items.find(i => i.id === reward.refId)?.name || reward.refId} ×${reward.amount}`;
     if (reward.type === 'equipment') return `⚔️ ${state.equipment.find(e => e.id === reward.refId)?.name || reward.refId} ×${reward.amount}`;
     if (reward.type === 'character') return `🧝 ${state.characters.find(c => c.id === reward.refId)?.name || reward.refId} ×${reward.amount}`;
@@ -3307,7 +3307,7 @@ const WBAdminPanel = (() => {
       ...state.config,
       gacha: {
         ...state.config.gacha,
-        currencyName: document.getElementById('gacha-currency')?.value.trim() || 'Cristaux',
+        currencyName: document.getElementById('gacha-currency')?.value.trim() || 'Essence Sauvage',
         singlePullCost: parseInt(document.getElementById('gacha-cost-single')?.value || '100'),
         tenPullCost: parseInt(document.getElementById('gacha-cost-ten')?.value || '900'),
         guaranteedRareAfter: parseInt(document.getElementById('gacha-pity-rare')?.value || '10'),
@@ -4256,7 +4256,7 @@ const WBAdminPanel = (() => {
         <div class="admin-section-title">Monnaies du joueur</div>
         <div class="admin-grid">
           <div class="admin-field">
-            <label>${(cfg.gacha||{}).currencyName || 'Diamants'} actuels</label>
+            <label>${(cfg.gacha||{}).currencyName || 'Essence Sauvage'} actuels</label>
             <input type="number" id="res-crystals" value="${player.currency.crystals}" min="0" />
           </div>
           <div class="admin-field">
@@ -4266,8 +4266,8 @@ const WBAdminPanel = (() => {
         </div>
         <div class="admin-actions">
           <button class="admin-btn admin-btn-success" onclick="WBAdminPanel._saveResources()">💾 Mettre à jour</button>
-          <button class="admin-btn admin-btn-warning" onclick="WBAdminPanel._addResources(1000)">+1000 Cristaux</button>
-          <button class="admin-btn admin-btn-warning" onclick="WBAdminPanel._addResources(99999)">+99999 Cristaux</button>
+          <button class="admin-btn admin-btn-warning" onclick="WBAdminPanel._addResources(1000)">+1000 Essence Sauvage</button>
+          <button class="admin-btn admin-btn-warning" onclick="WBAdminPanel._addResources(99999)">+99999 Essence Sauvage</button>
           <button class="admin-btn admin-btn-warning" onclick="WBAdminPanel._addResources(0, 1000)">+1000 Or</button>
           <button class="admin-btn admin-btn-warning" onclick="WBAdminPanel._addResources(0, 99999)">+99999 Or</button>
         </div>
@@ -4354,7 +4354,7 @@ const WBAdminPanel = (() => {
     if (crystalInp) crystalInp.value = WBGameState.getPlayer().currency.crystals;
     if (goldInp)     goldInp.value   = WBGameState.getPlayer().currency.gold;
     const parts = [];
-    if (crystalAmount) parts.push(`+${crystalAmount} Cristaux`);
+    if (crystalAmount) parts.push(`+${crystalAmount} Essence Sauvage`);
     if (goldAmount)     parts.push(`+${goldAmount} Or`);
     _notify(`✅ ${parts.join(', ')} ajoutés.`);
   }
@@ -4505,7 +4505,7 @@ const WBAdminPanel = (() => {
             <input type="number" id="combat-gold-per-enemy" value="${cCfg.rewardGoldPerEnemy}" min="0" step="1" />
           </div>
           <div class="admin-field">
-            <label>Diamants par ennemi vaincu</label>
+            <label>Essence Sauvage par ennemi vaincu</label>
             <input type="number" id="combat-diamonds-per-enemy" value="${cCfg.rewardDiamondsPerEnemy}" min="0" step="1" />
           </div>
           <div class="admin-field">
@@ -4514,7 +4514,7 @@ const WBAdminPanel = (() => {
           </div>
         </div>
         <p style="font-size:.75rem; color:#888; margin-top:8px;">
-          Aperçu pour 3 ennemis de niveau 10 : ${3 * 10 * cCfg.rewardXpPerEnemy} XP, ${3 * cCfg.rewardGoldPerEnemy} 💵, ${3 * cCfg.rewardDiamondsPerEnemy} 💎
+          Aperçu pour 3 ennemis de niveau 10 : ${3 * 10 * cCfg.rewardXpPerEnemy} XP, ${3 * cCfg.rewardGoldPerEnemy} 💵, ${3 * cCfg.rewardDiamondsPerEnemy} 💧
         </p>
       </div>
       <hr class="admin-sep" />
@@ -4741,7 +4741,7 @@ const WBAdminPanel = (() => {
             <input type="number" id="story-reward-elite" value="${cCfg.story?.rewardEliteGold ?? 100}" min="0" step="10" />
           </div>
           <div class="admin-field">
-            <label>Bonus diamants — victoire Boss 💎</label>
+            <label>Bonus Essence Sauvage — victoire Boss 💧</label>
             <input type="number" id="story-reward-boss" value="${cCfg.story?.rewardBossDiamonds ?? 100}" min="0" step="10" />
           </div>
         </div>
@@ -4896,7 +4896,7 @@ const WBAdminPanel = (() => {
       <option value="event_win_caprice">🌟 Réussir des Battues Sauvages</option>
       <option value="event_win_tag">✨ Réussir des combats [Tag]</option>
       <option value="event_win_with_tag">🏅 Finir combat avec perso [Tag] vivant</option>
-      <option value="event_summon">💎 Rencontrer sur la bannière [Tag]</option>`;
+      <option value="event_summon">💧 Rencontrer sur la bannière [Tag]</option>`;
 
     // ── Statut de l'Event ──
     const cur  = ev.current;
@@ -5055,7 +5055,7 @@ const WBAdminPanel = (() => {
 
         <!-- Taux bannière Event -->
         <details style="margin-bottom:12px">
-          <summary style="cursor:pointer;color:#7dd3fc;font-weight:700;font-size:.82rem">💎 Taux de la bannière Event</summary>
+          <summary style="cursor:pointer;color:#7dd3fc;font-weight:700;font-size:.82rem">💧 Taux de la bannière Event</summary>
           <div style="padding:10px;background:#1a1630;border-radius:6px;margin-top:6px">
             ${['mythic','legendary','epic','rare','uncommon','common'].map(r => {
               const rd = WBGameDatabase.RARITIES[r]||{};
@@ -5077,7 +5077,7 @@ const WBAdminPanel = (() => {
             const color = mode==='capriceDeEtoile' ? '#fcd34d' : '#a78bfa';
             return `<div style="background:#1a1630;border-radius:8px;padding:10px;border-left:3px solid ${color}">
               <div style="font-weight:700;color:${color};margin-bottom:8px;font-size:.85rem">${label}</div>
-              ${[['energyCost','Énergie',1,1,50],['difficulty','Difficulté ×',0.1,0.1,5],['xpMult','Mult. XP ×',0.1,0.1,5],['goldMult','Mult. $ ×',0.1,0.1,5],['diamondMult','Mult. 💎 ×',0.1,0.1,5]].map(([f,label,step,min,max])=>`
+              ${[['energyCost','Énergie',1,1,50],['difficulty','Difficulté ×',0.1,0.1,5],['xpMult','Mult. XP ×',0.1,0.1,5],['goldMult','Mult. $ ×',0.1,0.1,5],['diamondMult','Mult. 💧 ×',0.1,0.1,5]].map(([f,label,step,min,max])=>`
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
                   <label style="font-size:.72rem;color:#aaa;min-width:100px">${label}</label>
                   <input id="ev-tpl-cc-${mode}-${f}" type="number" step="${step}" min="${min}" max="${max}" value="${mc[f]??1}" style="width:65px">
@@ -5097,7 +5097,7 @@ const WBAdminPanel = (() => {
               <span style="font-size:.72rem;color:#888">×</span>
               <input id="ev-tpl-q${i}-target" type="number" min="1" value="${q.target}" style="width:55px">
               <select id="ev-tpl-q${i}-rtype" style="width:110px;font-size:.75rem">
-                <option value="crystals" ${q.reward?.type==='crystals'?'selected':''}>💎 Diamants</option>
+                <option value="crystals" ${q.reward?.type==='crystals'?'selected':''}>💧 Essence Sauvage</option>
                 <option value="gold"     ${q.reward?.type==='gold'    ?'selected':''}>💵 Or</option>
               </select>
               <input id="ev-tpl-q${i}-ramount" type="number" min="1" value="${q.reward?.amount||100}" style="width:65px">
@@ -5117,7 +5117,7 @@ const WBAdminPanel = (() => {
               <span style="font-size:.75rem;color:${isLast?'#fcd34d':'#aaa'};min-width:30px">J${day}${isLast?' ⭐':''}</span>
               <select id="ev-tpl-day${day}-type" style="width:110px;font-size:.72rem" onchange="WBAdminPanel._onTplDayTypeChange(${day})">
                 <option value="gold"      ${r.reward?.type==='gold'     ?'selected':''}>💵 Or</option>
-                <option value="crystals"  ${r.reward?.type==='crystals' ?'selected':''}>💎 Diamants</option>
+                <option value="crystals"  ${r.reward?.type==='crystals' ?'selected':''}>💧 Essence Sauvage</option>
                 <option value="character" ${r.reward?.type==='character'?'selected':''}>🎭 Personnage</option>
               </select>
               <input id="ev-tpl-day${day}-amount" type="number" min="1" value="${r.reward?.amount||1}" style="width:60px;font-size:.72rem">
@@ -5450,7 +5450,7 @@ const WBAdminPanel = (() => {
         </div>
         ${s.type === 'currency' ? `
         <div class="admin-field">
-          <label>💎 Diamants offerts</label>
+          <label>💧 Essence Sauvage offerte</label>
           <input type="number" id="tuto-step-${i}-crystals" value="${s.crystals??500}" min="0" style="width:100px">
         </div>
         <div class="admin-field">
@@ -6184,7 +6184,7 @@ const WBAdminPanel = (() => {
             <tr style="text-align:left;border-bottom:1px solid #333;">
               <th style="padding:6px 8px;">Joueur</th>
               <th style="padding:6px 8px;text-align:center;">Niveau</th>
-              <th style="padding:6px 8px;text-align:center;">💎</th>
+              <th style="padding:6px 8px;text-align:center;">💧</th>
               <th style="padding:6px 8px;text-align:center;">💵</th>
               <th style="padding:6px 8px;text-align:center;">Collection</th>
               <th style="padding:6px 8px;text-align:center;">Dernière sauvegarde</th>
