@@ -112,6 +112,21 @@
     box-shadow:0 0 80px rgba(0,0,0,.6), inset 0 0 0 1px var(--silk);
   }
 
+  /* Sur smartphone (écran tactile, quelle que soit sa largeur exacte) : l'app
+     colle aux deux bords de l'écran, jamais de bande de fond visible sur les
+     côtés. Ciblé sur "pointer:coarse" plutôt qu'une simple largeur, pour ne
+     JAMAIS affecter la version PC — même une fenêtre de bureau réduite très
+     étroite garde son cadre centré habituel. */
+  @media (pointer:coarse){
+    .app-shell{
+      max-width:100%;
+      width:100%;
+      margin:0;
+      border-left:none;
+      border-right:none;
+    }
+  }
+
   /* ── HEADER ── */
   .app-header{
     flex:0 0 auto;
@@ -3434,7 +3449,7 @@
   /* ============================================================
      RESPONSIVE
      ============================================================ */
-  @media (min-width:680px){
+  @media (min-width:680px) and (pointer:fine){
     body{ overflow:auto; }
     .app-shell{ min-height:100vh; height:auto; border-left:1px solid var(--border-soft); border-right:1px solid var(--border-soft); }
     .main-content{ max-height:none; }
