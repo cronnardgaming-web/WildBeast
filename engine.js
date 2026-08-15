@@ -317,25 +317,57 @@ const WBCombatEngine = (() => {
    * @param {object} rarityWeights
    * @param {number} [stageFactor=1] - cfg.combat.evolvedFormWeightFactor (1 = pas de réduction)
    */
+  /**
+   * Tirage en 2 étapes, pour que le % affiché dans l'admin ("Fréquence
+   * d'apparition par rareté") soit une garantie EXACTE, peu importe combien
+   * d'espèces existent dans chaque palier :
+   *   1) On tire d'abord la RARETÉ selon les poids configurés (ex: 50.25%
+   *      commune, 0.5% mythique...).
+   *   2) PUIS, au sein de cette rareté, on tire à égalité parmi les espèces
+   *      disponibles (pondéré uniquement par stageFactor pour réduire la
+   *      fréquence des formes évoluées, là où c'est pertinent).
+   */
   function _pickWeightedRandomChar(chars, rarityWeights, stageFactor = 1) {
-    const weighted = chars.map(c => ({
-      c,
-      // Fallback à 0 (pas 1) si la rareté n'est pas dans les poids — évite les mythiques non prévus
-      w: Math.max(0, rarityWeights?.[c.rarity] ?? 0) * Math.pow(stageFactor, c.evolutionStage || 0),
+    const byRarity = {};
+    chars.forEach(c => { (byRarity[c.rarity] = byRarity[c.rarity] || []).push(c); });
+    const availableRarities = Object.keys(byRarity).filter(r => byRarity[r].length > 0);
+
+    if (availableRarities.length === 0) return null;
+
+    const weightedRarities = availableRarities.map(r => ({
+      r, w: Math.max(0, rarityWeights?.[r] ?? 0),
     }));
-    const total = weighted.reduce((s, x) => s + x.w, 0);
-    // Si total = 0 (aucun poids défini), fallback équitable sur toutes les raretés définies
-    if (total <= 0) {
-      const fallback = chars.filter(c => (WBGameDatabase.RARITIES[c.rarity]?.gachaWeight || 0) > 0);
-      const pool = fallback.length > 0 ? fallback : chars;
-      return pool[Math.floor(Math.random() * pool.length)];
+    const totalRarityWeight = weightedRarities.reduce((s, x) => s + x.w, 0);
+
+    let chosenRarity;
+    if (totalRarityWeight <= 0) {
+      // Aucun poids défini pour les raretés disponibles : repli équitable sur
+      // les raretés qui ont un poids gacha défini, sinon toutes.
+      const fallback = availableRarities.filter(r => (WBGameDatabase.RARITIES[r]?.gachaWeight || 0) > 0);
+      const pool = fallback.length > 0 ? fallback : availableRarities;
+      chosenRarity = pool[Math.floor(Math.random() * pool.length)];
+    } else {
+      let roll = Math.random() * totalRarityWeight;
+      chosenRarity = weightedRarities[weightedRarities.length - 1].r;
+      for (const x of weightedRarities) {
+        roll -= x.w;
+        if (roll <= 0) { chosenRarity = x.r; break; }
+      }
     }
-    let roll = Math.random() * total;
-    for (const x of weighted) {
-      roll -= x.w;
-      if (roll <= 0) return x.c;
+
+    // Étape 2 : tirage à égalité parmi les espèces de la rareté choisie
+    // (stageFactor réduit la fréquence des formes évoluées au sein du palier).
+    const poolInRarity = byRarity[chosenRarity];
+    const weightedSpecies = poolInRarity.map(c => ({ c, w: Math.pow(stageFactor, c.evolutionStage || 0) }));
+    const totalSpeciesWeight = weightedSpecies.reduce((s, x) => s + x.w, 0);
+    if (totalSpeciesWeight <= 0) return poolInRarity[Math.floor(Math.random() * poolInRarity.length)];
+
+    let roll2 = Math.random() * totalSpeciesWeight;
+    for (const x of weightedSpecies) {
+      roll2 -= x.w;
+      if (roll2 <= 0) return x.c;
     }
-    return weighted[weighted.length - 1].c;
+    return poolInRarity[poolInRarity.length - 1];
   }
 
   /**
