@@ -842,8 +842,8 @@ const WBGameUI = (() => {
       { id:'fullRandom',   icon:'🎲', name:'Battue',           desc:'Équipe aléatoire, ennemies aléatoires',               featured:false, unlocked:WBGameState.isFeatureUnlocked?.('caprice')   ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 2' },
       { id:'story',        icon:'🌍', name:'Expédition',       desc:'Progressez monde par monde',                          featured:false, unlocked:WBGameState.isFeatureUnlocked?.('tournee')   ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 3' },
       { id:'byLine',       icon:'🐾', name:'Élevage',          desc:'Affrontez toute une lignée',                          featured:false, unlocked:WBGameState.isFeatureUnlocked?.('saga')      ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 4' },
-      { id:'arena',        icon:'🏆', name:'Grand Gala',       desc:'Mode compétitif',                                     featured:false, unlocked:WBGameState.isFeatureUnlocked?.('grandgala') ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 5' },
-      { id:'trophy',       icon:'🏆', name:'Trophée',          desc:'Battez vos propres records',                          featured:false, unlocked:WBGameState.isFeatureUnlocked?.('trophy')    ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 6' },
+      { id:'arena',        icon:'🗺️', name:'Territoire',       desc:'Affrontez 6 créatures du même type',                  featured:false, unlocked:WBGameState.isFeatureUnlocked?.('grandgala') ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 5' },
+      { id:'trophy',       icon:'🎯', name:'Traque',           desc:'Battez vos propres records',                          featured:false, unlocked:WBGameState.isFeatureUnlocked?.('trophy')    ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 6' },
       { id:'challenge',    icon:'🌀', name:'???',              desc:'Un nouveau défi vous attend...',                      featured:false, unlocked:false, lockedDesc:'🔒 Bientôt disponible' },
       // Événement — blingbling, pleine largeur
       { id:'event',        icon:'⭐', name:'Événement',        desc:'Des histoires exclusives aux créatures de l\'Event',   featured:false, unlocked:false, lockedDesc:'🔒 Bientôt disponible', eventFeatured:true },
@@ -1557,7 +1557,7 @@ L'ordre n'a pas d'importance — l'initiative dépend de la <b>Grâce</b> de cha
       text: `<b>🌍 Expédition</b> — Progression par monde. Clé pour la montée en niveau.<br>
 <b>🐾 Élevage</b> — Affronte toute la lignée d'une créature (toutes ses évolutions).<br>
 <b>🎲 Battue</b> — Équipe aléatoire tirée de ta collection.<br>
-<b>🏛️ Arène</b> — Mode compétitif avec règles spéciales.<br>
+<b>🗺️ Territoire</b> — Affronte 6 créatures d'un même type, dans son propre territoire.<br>
 <b>✨ Battue Sauvage</b> — Équipe aléatoire, ennemies du Tag Event uniquement.<br>
 <b>✨ Combat [Tag]</b> — Alliées ET ennemies du Tag Event uniquement. Récompenses bonifiées.`,
     },
@@ -2400,7 +2400,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         🎲 Battue <span class="energy-cost-badge">⚡${costs.fullRandom ?? 10}</span>
       </button>
       <button class="combat-mode-btn ${_combatMode === 'arena' ? 'active' : ''}" data-mode="arena">
-        🏛️ Arène <span class="energy-cost-badge">⚡${costs.arena ?? 15}</span>
+        🗺️ Territoire <span class="energy-cost-badge">⚡${costs.arena ?? 15}</span>
       </button>`;
 
     // Onglets event — mis en avant si un event est actif
@@ -2528,7 +2528,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     // Bouton en haut
     if (top) {
       top.innerHTML = _selectedArenaType && team.length > 0
-        ? `<button class="btn-primary btn-launch-combat" id="btn-launch-arena" style="width:100%;margin-bottom:8px">🏛️ Entrer dans l'arène</button>`
+        ? `<button class="btn-primary btn-launch-combat" id="btn-launch-arena" style="width:100%;margin-bottom:8px">🗺️ Entrer sur le territoire</button>`
         : '';
       document.getElementById('btn-launch-arena')?.addEventListener('click', () => _launchCombat({ mode: 'arena', arenaType: _selectedArenaType }));
     }
@@ -2574,9 +2574,9 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         ${typeUnlockData.map(({ type: t, totalLines, unlockedLines, isUnlocked }) => {
           if (isUnlocked) {
             return `
-            <div class="evo-line-card arena-card ${_selectedArenaType === t.id ? 'selected' : ''}" data-arena-type="${t.id}" title="Arène ${t.name}">
+            <div class="evo-line-card arena-card ${_selectedArenaType === t.id ? 'selected' : ''}" data-arena-type="${t.id}" title="Territoire ${t.name}">
               <div class="arena-type-icon" style="background:${t.color}">${t.icon}</div>
-              <div class="evo-line-name" style="color:${t.color}">Arène ${t.name}</div>
+              <div class="evo-line-name" style="color:${t.color}">Territoire ${t.name}</div>
               <div class="evo-line-meta">
                 <span class="evo-line-count">6 ennemis ${t.name}</span>
               </div>
@@ -2588,7 +2588,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
             return `
             <div class="evo-line-card arena-card locked" title="Débloquez ${ARENA_REQUIRED_LINES - unlockedLines} lignée(s) ${t.name} de plus">
               <div class="arena-type-icon" style="background:#333;opacity:0.6">${t.icon}</div>
-              <div class="evo-line-name" style="color:#666">Arène ${t.name}</div>
+              <div class="evo-line-name" style="color:#666">Territoire ${t.name}</div>
               <div class="evo-line-meta">
                 <span class="evo-line-count" style="color:#555">${progress}/${ARENA_REQUIRED_LINES} lignées</span>
               </div>
@@ -2836,7 +2836,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     lobby.style.display = 'none';
     battleArea.style.display = 'block';
 
-    // Pendant le combat : masquer les onglets de mode (Expédition/Élevage/Battue/Arène/...)
+    // Pendant le combat : masquer les onglets de mode (Expédition/Élevage/Battue/Territoire/...)
     // et le menu de navigation du bas, pour ne pas pouvoir quitter le combat.
     const tabsEl = document.querySelector('.combat-mode-tabs');
     if (tabsEl) tabsEl.style.display = 'none';
@@ -2868,7 +2868,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     area.innerHTML = `
       ${b.mode === 'trophy' ? `
         <div class="trophy-hud" id="trophy-hud">
-          <span class="trophy-hud-score">🏆 Score : <strong id="trophy-hud-score-value">${(b.trophyScore || 0).toLocaleString('fr-FR')}</strong></span>
+          <span class="trophy-hud-score">🎯 Score : <strong id="trophy-hud-score-value">${(b.trophyScore || 0).toLocaleString('fr-FR')}</strong></span>
           <span class="trophy-hud-rounds">Tour <strong id="trophy-hud-round-value">${b.turn}</strong> / ${trophyCfg.rounds || 15}</span>
         </div>` : ''}
       <div class="battle-scene">
@@ -3975,7 +3975,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     overlay.innerHTML = `
       <div class="bro-victory-top">
         <div class="bro-glow-ring"></div>
-        <div class="bro-title">🏆 SCORE FINAL</div>
+        <div class="bro-title">🎯 SCORE FINAL</div>
         <div class="bro-subtitle" style="font-size:1.6rem;font-weight:800;color:var(--accent);margin-top:8px">${finalScore.toLocaleString('fr-FR')}</div>
         ${isNewBest ? `<div class="bro-subtitle" style="margin-top:4px">✨ Nouveau record personnel !</div>` : `<div class="bro-subtitle" style="margin-top:4px">Meilleur score : ${bestScore.toLocaleString('fr-FR')}</div>`}
       </div>

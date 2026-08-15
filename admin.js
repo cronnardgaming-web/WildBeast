@@ -4305,7 +4305,7 @@ const WBAdminPanel = (() => {
             <input type="number" id="res-energy-cost-fullrandom" value="${cfg.energy.costs?.fullRandom ?? 10}" min="0" />
           </div>
           <div class="admin-field">
-            <label>Coût Arène</label>
+            <label>Coût Territoire</label>
             <input type="number" id="res-energy-cost-arena" value="${cfg.energy.costs?.arena ?? 15}" min="0" />
           </div>
           <div class="admin-field">
@@ -4650,7 +4650,7 @@ const WBAdminPanel = (() => {
           Une forme évoluée n'intègre le pool d'ennemis qu'une fois débloquée par le joueur
           (présente dans son Catalogue). Une fois débloquée, ce facteur réduit son poids de
           sélection à chaque stade d'évolution (stade 1 → ×facteur, stade 2 → ×facteur², etc.).
-          S'applique aux combats Aléatoire, Arène, Odyssée <strong>et</strong> par Lignée.
+          S'applique aux combats Aléatoire, Territoire, Odyssée <strong>et</strong> par Lignée.
         </p>
         <div class="admin-grid">
           <div class="admin-field">
@@ -4862,7 +4862,7 @@ const WBAdminPanel = (() => {
       </div>
 
       <div class="admin-section">
-        <div class="admin-section-title">🏆 Mode Trophée (score attack)</div>
+        <div class="admin-section-title">🎯 Mode Traque (score attack)</div>
         <p style="font-size:.78rem;color:#888;margin:0 0 12px">
           Vagues d'ennemis Niveau 1 à l'infini pendant un nombre de tours fixe. Les ennemis n'attaquent jamais — seul le score compte. Aucun XP/Or/Essence Sauvage gagné sur ce mode.
         </p>
