@@ -3769,6 +3769,10 @@
       //    les 30s pour CHAQUE joueur connecté, même sans la moindre activité).
       let _lastGameDataJSON   = JSON.stringify(gameData);
       let _lastPlayerJSON     = JSON.stringify(playerData || {});
+      // Compteur de sauvegardes Supabase en cours (jamais négatif). Tant qu'il
+      // est > 0, un rechargement/une fermeture de la page perdrait la dernière
+      // modification (cf. avertissement beforeunload plus bas).
+      let _pendingSaveCount = 0;
       // Garde interne : quand true, _persist ne fait RIEN — ni la version
       // déclenchée par les mutations, ni celle du minuteur périodique de
       // sécurité plus bas (les deux passent par CETTE fonction, donc les
@@ -3780,6 +3784,7 @@
 
         const playerJson = JSON.stringify(player);
         if (playerJson !== _lastPlayerJSON) {
+          _pendingSaveCount++;
           WBBackend.savePlayerData(userId, player)
             .then(() => {
               _lastPlayerJSON = playerJson;
@@ -3792,7 +3797,8 @@
                   .catch(err => console.error('[Autosave] Classement :', err));
               }
             })
-            .catch(err => console.error('[Autosave] Progression joueur :', err));
+            .catch(err => console.error('[Autosave] Progression joueur :', err))
+            .finally(() => { _pendingSaveCount = Math.max(0, _pendingSaveCount - 1); });
           // Note : _lastPlayerJSON n'est mis à jour qu'en cas de succès — un
           // échec laisse la valeur différente, donc le prochain passage
           // (mutation suivante ou filet de sécurité périodique) retentera
@@ -3802,13 +3808,26 @@
         if (isAdmin) {
           const json = JSON.stringify(structural);
           if (json !== _lastGameDataJSON) {
+            _pendingSaveCount++;
             WBBackend.saveGameData(structural)
               .then(() => { _lastGameDataJSON = json; })
-              .catch(err => console.error('[Autosave] Données de jeu :', err));
+              .catch(err => console.error('[Autosave] Données de jeu :', err))
+              .finally(() => { _pendingSaveCount = Math.max(0, _pendingSaveCount - 1); });
           }
         }
       }
       WBGameState.setAutoSaveFn(_persist);
+
+      // Avertit avant de quitter/recharger la page tant qu'une sauvegarde vers
+      // Supabase est encore en cours — évite de perdre la toute dernière
+      // modification (ex: config admin) si la page est rechargée trop vite
+      // après avoir cliqué sur "Enregistrer".
+      window.addEventListener('beforeunload', (e) => {
+        if (_pendingSaveCount > 0) {
+          e.preventDefault();
+          e.returnValue = '';
+        }
+      });
 
       // Publication initiale des chiffres de classement à la connexion (pas
       // seulement après une modification) : garantit que même un joueur qui
