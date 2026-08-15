@@ -722,7 +722,7 @@ const WBGameUI = (() => {
       <div class="nav-new-btn" id="nav-gacha-btn" data-screen="gacha">
         <span class="nav-ico">📡</span><span class="nav-lbl">SIGNAL</span>
       </div>
-      <div class="nav-new-btn" data-screen="shop">
+      <div class="nav-new-btn" id="nav-shop-btn" data-screen="shop">
         <span class="nav-ico">🛍️</span><span class="nav-lbl">SHOP</span>
       </div>
       <div class="nav-new-btn" id="nav-plus-btn">
@@ -750,6 +750,21 @@ const WBGameUI = (() => {
     const lockBadge = document.getElementById('hub-gacha-lock');
     if (lockBadge) lockBadge.style.display = gachaUnlocked ? 'none' : 'flex';
 
+    // Bouton Shop — verrouillé en même temps que le Signal
+    const shopBtn = document.getElementById('nav-shop-btn');
+    if (!gachaUnlocked && shopBtn) {
+      shopBtn.style.opacity = '.45';
+      shopBtn.title = 'Disponible au Chapitre 2, Stage 5';
+    }
+    shopBtn?.addEventListener('click', () => {
+      if (!WBGameState.isFeatureUnlocked?.('gacha')) {
+        _showToast('🔒 Shop disponible au Chapitre 2, Stage 5', 'info');
+        return;
+      }
+      showScreen('shop');
+      _setNavActive('shop');
+    });
+
     // Hub zones
     document.querySelectorAll('.hub-zone').forEach(z => {
       z.addEventListener('click', () => {
@@ -769,7 +784,6 @@ const WBGameUI = (() => {
         if (s === 'hub')       { showScreen('hub');        _setNavActive('hub');        return; }
         if (s === 'collection'){ showScreen('collection'); _setNavActive('collection'); return; }
         if (s === 'team-hub')  { showScreen('team-hub');  _setNavActive('team-hub');  return; }
-        if (s === 'shop')      { showScreen('shop');       _setNavActive('shop');      return; }
       });
     });
 
@@ -1293,7 +1307,7 @@ const WBGameUI = (() => {
       { label: '⚡ Série actuelle',     value: (stats.currentWinStreak||0).toLocaleString('fr-FR'), highlight: false },
       { label: '🔥 Meilleure série',    value: (stats.longestWinStreak||0).toLocaleString('fr-FR'), highlight: true  },
       { label: '💥 Ennemis vaincus',   value: (stats.totalKills||0).toLocaleString('fr-FR'),       highlight: false, progress: _progressBarHtml('kills') },
-      { label: '🎭 Captures',           value: (stats.totalCaptures||0).toLocaleString('fr-FR'),    highlight: false, progress: _progressBarHtml('captures') },
+      { label: '🐾 Apprivoisements',    value: (stats.totalCaptures||0).toLocaleString('fr-FR'),    highlight: false, progress: _progressBarHtml('captures') },
       { label: '💧 Invocations',        value: (stats.totalPulls||0).toLocaleString('fr-FR'),       highlight: false, progress: _progressBarHtml('pulls') },
       { label: '✨ Évolutions',         value: (stats.totalEvolutions||0).toLocaleString('fr-FR'), highlight: false, progress: _progressBarHtml('evolutions') },
       { label: '⭐ Éveils',             value: (stats.totalAwakenings||0).toLocaleString('fr-FR'), highlight: false, progress: _progressBarHtml('awakenings') },
@@ -3905,11 +3919,11 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     const capturable = isVictory ? (battle?.capturable?.filter(c => !c.captured) || []) : [];
     const captureHtml = capturable.length ? `
       <div class="bro-capture">
-        <h4 class="bro-capture-title">💋 Tentatives de séduction</h4>
+        <h4 class="bro-capture-title">🐾 Tentatives d'apprivoisement</h4>
         <div class="bro-capture-btns">
           ${capturable.map(c => `
             <button class="btn-capture" data-iid="${c.instanceId}" data-char-id="${c.charId}">
-              Capturer ${c.name}${c.mergedCount > 1 ? ` ×${c.mergedCount}` : ''} (${Math.round(c.captureRate*100)}%)
+              Apprivoiser ${c.name}${c.mergedCount > 1 ? ` ×${c.mergedCount}` : ''} (${Math.round(c.captureRate*100)}%)
             </button>`).join('')}
         </div>
         <div id="capture-reveal"></div>
@@ -5732,7 +5746,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         const pct      = Math.min(100, Math.round((progress / q.target) * 100));
         const typeLabel = {
           event_defeat:       `⚔️ Éliminer ${q.target} rivales ${tag?.name || 'Event'}`,
-          event_capture:      `🎭 Capturer ${q.target} rivales ${tag?.name || 'Event'}`,
+          event_capture:      `🐾 Apprivoiser ${q.target} créatures ${tag?.name || 'Event'}`,
           event_win_caprice:  `🌟 Réussir ${q.target} Battue Sauvage`,
           event_win_tag:      `✨ Réussir ${q.target} combats ${tag?.name || 'Event'}`,
           event_win_with_tag: `🏅 Finir ${q.target} combats avec un perso ${tag?.name || 'Event'} vivant`,

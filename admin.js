@@ -2595,7 +2595,7 @@ const WBAdminPanel = (() => {
               ${Object.entries(QUEST_TYPES).map(([key, def]) => `<option value="${key}">${def.label}</option>`).join('')}
             </select>
           </div>
-          <div class="admin-field"><label>Nom affiché</label><input type="text" id="quest-name" placeholder="Capturer 5 créatures" /></div>
+          <div class="admin-field"><label>Nom affiché</label><input type="text" id="quest-name" placeholder="Apprivoiser 5 créatures" /></div>
           <div class="admin-field"><label>Objectif</label><input type="number" id="quest-target" value="1" min="1" /></div>
           <div class="admin-field"><label>Activée</label>
             <select id="quest-enabled"><option value="1">Oui</option><option value="0">Non</option></select>
@@ -4328,7 +4328,7 @@ const WBAdminPanel = (() => {
           🎯 Combats : <strong style="color:#e8d5b7">${player.stats.totalBattles}</strong><br/>
           🏆 Victoires : <strong style="color:#4ade80">${player.stats.totalVictories}</strong><br/>
           🎲 Invocations : <strong style="color:#c4b5fd">${player.stats.totalPulls}</strong><br/>
-          🎣 Captures : <strong style="color:#60a5fa">${player.stats.totalCaptures}</strong>
+          🐾 Apprivoisements : <strong style="color:#60a5fa">${player.stats.totalCaptures}</strong>
         </div>
         <div class="admin-actions">
           <button class="admin-btn admin-btn-danger" onclick="WBAdminPanel._resetStats()">🗑️ Réinitialiser les stats</button>
@@ -4892,7 +4892,7 @@ const WBAdminPanel = (() => {
 
     const QUEST_TYPE_OPTIONS = `
       <option value="event_defeat">⚔️ Éliminer des rivales [Tag]</option>
-      <option value="event_capture">🎭 Capturer des rivales [Tag]</option>
+      <option value="event_capture">🐾 Apprivoiser des créatures [Tag]</option>
       <option value="event_win_caprice">🌟 Réussir des Battues Sauvages</option>
       <option value="event_win_tag">✨ Réussir des combats [Tag]</option>
       <option value="event_win_with_tag">🏅 Finir combat avec perso [Tag] vivant</option>
