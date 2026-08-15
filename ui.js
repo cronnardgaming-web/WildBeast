@@ -3123,24 +3123,32 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     // attend pour l'affichage, relire l'état "en direct" plus tard montrerait
     // un PV/statut déjà périmé (celui d'un tour ultérieur). On fige donc ici
     // exactement ce qu'il faut montrer, et on se contente de l'injecter tel
-    // quel dans le DOM une fois le délai écoulé.
+    // quel dans le DOM au bon moment (cf. onFxStart / onImpact ci-dessous).
+    //
+    // Nouvel enchaînement (identique pour tous les passifs à PV) :
+    //   1) la bannière (nom du passif) apparaît seule
+    //   2) ~1s avant qu'elle reparte : onFxStart() joue l'animation du passif
+    //   3) au moment exact où ce FX se termine : onImpact() fait apparaître les
+    //      chiffres de dégâts/soin ET met à jour la barre de vie, ensemble.
+    let onFxStart = null;
+    let onImpact  = null;
     let onRetreat = null;
 
     if (effectType === 'end_turn_aoe_damage') {
       const targetIds = data.extra?.targetIds || [];
       const damageMap = data.extra?.damageMap || {};
-      targetIds.forEach(id => {
-        const targetCard = document.getElementById(`fighter-${id}`);
-        _spawnPassiveFx(targetCard, 'wave');
-        const dmg = damageMap[id];
-        if (dmg != null) _spawnFloatText(targetCard, `-${dmg}`, 'float-passive-dmg', 0);
-      });
-      WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.hitNormal);
-      // Snapshot des PV actuels (déjà appliqués par le moteur) de chaque cible
       const hpSnapshot = {};
       targetIds.forEach(id => { const c = _findCombatantById(id); if (c) hpSnapshot[id] = c.currentHp; });
-      onRetreat = () => {
+
+      onFxStart = () => {
+        targetIds.forEach(id => _spawnPassiveFx(document.getElementById(`fighter-${id}`), 'wave'));
+        WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.hitNormal);
+      };
+      onImpact = () => {
         targetIds.forEach(id => {
+          const targetCard = document.getElementById(`fighter-${id}`);
+          const dmg = damageMap[id];
+          if (dmg != null) _spawnFloatText(targetCard, `-${dmg}`, 'float-passive-dmg', 0);
           const c = _findCombatantById(id);
           if (!c || hpSnapshot[id] === undefined) return;
           const saved = c.currentHp;
@@ -3152,15 +3160,17 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       };
 
     } else if (effectType === 'end_turn_heal_lowest_ally') {
-      const healedCard = document.getElementById(`fighter-${data.extra?.healedId}`);
-      _spawnPassiveFx(healedCard, 'heal');
-      const amount = data.extra?.amount;
-      if (amount != null) _spawnFloatText(healedCard, `+${amount}`, 'float-passive-heal', 0);
-      WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.levelUp);
-      // hpAfter est déjà un instantané figé fourni par le moteur : sûr à utiliser tel quel
       const healedId = data.extra?.healedId;
       const hpAfter  = data.extra?.hpAfter;
-      onRetreat = () => {
+      const amount   = data.extra?.amount;
+
+      onFxStart = () => {
+        _spawnPassiveFx(document.getElementById(`fighter-${healedId}`), 'heal');
+        WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.levelUp);
+      };
+      onImpact = () => {
+        const healedCard = document.getElementById(`fighter-${healedId}`);
+        if (amount != null) _spawnFloatText(healedCard, `+${amount}`, 'float-passive-heal', 0);
         const healed = _findCombatantById(healedId);
         if (healed && hpAfter !== undefined) {
           const saved = healed.currentHp;
@@ -3174,30 +3184,32 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       };
 
     } else if (effectType === 'buff_ally_atk_once') {
-      const buffedCard = document.getElementById(`fighter-${data.extra?.buffedId}`);
-      _spawnPassiveFx(buffedCard, 'buff');
-      WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.gachaPull);
-      // Icônes de statut figées maintenant (le buff est déjà appliqué côté moteur)
       const buffedId = data.extra?.buffedId;
       const buffedIconsHtml = (() => {
         const c = _findCombatantById(buffedId);
         return c ? _renderStatusIcons(c) : null;
       })();
-      onRetreat = () => {
+      onFxStart = () => {
+        _spawnPassiveFx(document.getElementById(`fighter-${buffedId}`), 'buff');
+        WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.gachaPull);
+      };
+      onImpact = () => {
         if (buffedIconsHtml === null) return;
         const ic = document.getElementById(`status-icons-${buffedId}`);
         if (ic) ic.innerHTML = buffedIconsHtml;
       };
 
     } else if (effectType === 'pre_attack_cleanse_self') {
-      _spawnPassiveFx(sourceCard, 'cleanse');
-      WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.hitResist);
       const srcId = data.combatantId;
       const srcIconsHtml = (() => {
         const c = _findCombatantById(srcId);
         return c ? _renderStatusIcons(c) : null;
       })();
-      onRetreat = () => {
+      onFxStart = () => {
+        _spawnPassiveFx(sourceCard, 'cleanse');
+        WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.hitResist);
+      };
+      onImpact = () => {
         if (srcIconsHtml === null) return;
         const ic = document.getElementById(`status-icons-${srcId}`);
         if (ic) ic.innerHTML = srcIconsHtml;
@@ -3205,14 +3217,12 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
 
     } else if (effectType === 'on_damaged_counter') {
       // Contre-Attaque : riposte rapide — mini-bannière courte au-dessus du portrait
-      // plutôt que la grande bannière centrale, mais on respecte le même principe :
-      // le PV ne change qu'une fois la mini-bannière disparue (+1s).
-      const targetCard = document.getElementById(`fighter-${data.extra?.targetId}`);
-      const targetId   = data.extra?.targetId;
+      // plutôt que la grande bannière centrale. Même principe que les autres : le
+      // flash (FX) se joue d'abord, PUIS chiffre de dégâts + PV ensemble à la fin.
+      const targetId = data.extra?.targetId;
       const dmg = data.extra?.damage;
       WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.hitWeak);
 
-      // Flash éclair sur le riposteur
       _spawnPassiveFx(sourceCard, 'counter');
       const log = document.getElementById('battle-log');
       if (log && _battle?.log?.length) {
@@ -3239,12 +3249,13 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         requestAnimationFrame(() => requestAnimationFrame(() => { miniB.style.opacity = '1'; }));
         setTimeout(() => { miniB.style.opacity = '0'; setTimeout(() => miniB.remove(), 200); }, 700);
       }
-      // Chiffre de dégâts sur la cible (feedback immédiat, comme l'impact d'un coup normal)
-      if (dmg != null && targetCard) _spawnFloatText(targetCard, `-${dmg}`, 'float-passive-dmg', 0);
       // Snapshot du PV cible (déjà appliqué par le moteur)
       const hpAfterCounter = (() => { const c = _findCombatantById(targetId); return c ? c.currentHp : undefined; })();
-      // Mini-bannière disparue vers ~900ms → +1s → PV visible à ~1900ms, libération peu après
+      // Le flash + mini-bannière durent ~900ms : chiffre de dégâts ET PV
+      // apparaissent ENSEMBLE juste après, pas avant.
       setTimeout(() => {
+        const targetCard = document.getElementById(`fighter-${targetId}`);
+        if (dmg != null && targetCard) _spawnFloatText(targetCard, `-${dmg}`, 'float-passive-dmg', 0);
         const c = _findCombatantById(targetId);
         if (c && hpAfterCounter !== undefined) {
           const saved = c.currentHp;
@@ -3256,46 +3267,55 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         }
         _renderTurnOrderBar();
         _combatAnimDone();
-      }, 1900);
-      return; // ce cas gère sa propre file, pas de bannière centrale ni de onRetreat
+      }, 900);
+      return; // ce cas gère sa propre file, pas de bannière centrale
 
     } else if (effectType === 'random_passive_steal') {
-      _spawnPassiveFx(sourceCard, 'steal');
-      WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.evolution);
+      onFxStart = () => {
+        _spawnPassiveFx(sourceCard, 'steal');
+        WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.evolution);
+      };
       // La bannière Mystère affiche le passif Mystère puis swape vers le passif copié —
       // aucun PV/statut à afficher pour ce déclenchement précis (le passif copié
       // s'affichera correctement de lui-même à son propre déclenchement futur).
 
     } else if (effectType === 'stat_boost_evasion') {
-      _spawnPassiveFx(sourceCard, 'adorable');
-      WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.hitResist);
+      onFxStart = () => {
+        _spawnPassiveFx(sourceCard, 'adorable');
+        WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.hitResist);
+      };
 
     } else if (effectType === 'stat_boost_crit_damage') {
-      _spawnPassiveFx(sourceCard, 'scenique');
-      WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.hitWeak);
+      onFxStart = () => {
+        _spawnPassiveFx(sourceCard, 'scenique');
+        WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.hitWeak);
+      };
 
     } else if (['on_hit_paralyze', 'on_hit_poison', 'on_hit_charm'].includes(effectType)) {
       const statusVariant = effectType === 'on_hit_paralyze' ? 'paralysis'
                           : effectType === 'on_hit_poison'   ? 'poison'
                           :                                    'charm';
       const targetId = data.extra?.targetId;
-      _spawnPassiveFx(document.getElementById(`fighter-${targetId}`), statusVariant);
-      WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.hitWeak);
       const targetIconsHtml = (() => {
         const c = _findCombatantById(targetId);
         return c ? _renderStatusIcons(c) : null;
       })();
-      onRetreat = () => {
+      onFxStart = () => {
+        _spawnPassiveFx(document.getElementById(`fighter-${targetId}`), statusVariant);
+        WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.hitWeak);
+      };
+      onImpact = () => {
         if (targetIconsHtml === null) return;
         const ic = document.getElementById(`status-icons-${targetId}`);
         if (ic) ic.innerHTML = targetIconsHtml;
       };
     }
 
-    // La grande bannière centrale dure ~2.46s ; si onRetreat est fourni, elle
-    // attend encore 1s après sa disparition avant de l'appeler puis de libérer
-    // la file (cf. _spawnPassiveBanner). Sinon elle libère la file directement.
-    _spawnPassiveBanner(sourceCard, data.passiveName, data.extra?.copiedPassiveName || null, { onRetreat });
+    // La grande bannière centrale dure ~2.46s : elle apparaît seule, puis
+    // onFxStart() joue le FX ~1s avant qu'elle reparte, puis onImpact() (chiffres
+    // + PV, ensemble) juste à la fin de ce FX. onRetreat (icônes de statut restant
+    // à appliquer, s'il y en a) suit la disparition complète de la bannière.
+    _spawnPassiveBanner(sourceCard, data.passiveName, data.extra?.copiedPassiveName || null, { onFxStart, onImpact, onRetreat });
   }
   /** Réagit à un effet de statut qui tique tout seul (poison) ou bloque un tour (paralysie/charme) */
   function _onStatusTriggered(data) {
@@ -3338,10 +3358,10 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       setTimeout(_combatAnimDone, 624);
 
     } else if (data.statusType === 'paralysis') {
-      _spawnPassiveFx(card, 'paralysis');
       // Icônes figées maintenant (le statut est déjà consommé côté moteur)
       const iconsHtml = combatant ? _renderStatusIcons(combatant) : null;
       _spawnPassiveBanner(card, 'Paralysé(e) !', null, {
+        onFxStart: () => _spawnPassiveFx(card, 'paralysis'),
         onRetreat: () => {
           if (iconsHtml === null) return;
           const ic = document.getElementById(`status-icons-${data.combatantId}`);
@@ -3350,9 +3370,9 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       });
 
     } else if (data.statusType === 'charm') {
-      _spawnPassiveFx(card, 'charm');
       const iconsHtml = combatant ? _renderStatusIcons(combatant) : null;
       _spawnPassiveBanner(card, 'Charmé(e) !', null, {
+        onFxStart: () => _spawnPassiveFx(card, 'charm'),
         onRetreat: () => {
           if (iconsHtml === null) return;
           const ic = document.getElementById(`status-icons-${data.combatantId}`);
@@ -3388,6 +3408,19 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
    *        passif doivent être appliqués, pour ne jamais les montrer en même temps que
    *        le nom du passif à l'écran.
    */
+  /**
+   * Affiche la grande bannière centrale d'un passif, avec le nouvel enchaînement
+   * demandé :
+   *   1) La bannière (nom du passif) apparaît SEULE.
+   *   2) ~1s avant qu'elle ne commence à disparaître : opts.onFxStart() — c'est
+   *      là que l'animation visuelle propre au passif (vague, soin, etc.) doit
+   *      se jouer (durée ~1000ms, cf. _spawnPassiveFx).
+   *   3) Au moment exact où ce FX se termine (juste avant que la bannière parte) :
+   *      opts.onImpact() — c'est là, et SEULEMENT là, qu'il faut faire apparaître
+   *      les chiffres de dégâts/soin ET baisser/monter la barre de vie, les deux
+   *      en même temps.
+   * opts.onRetreat reste disponible pour les cas sans FX (icônes de statut...).
+   */
   function _spawnPassiveBanner(card, text, secondaryText, opts = {}) {
     // Log mis à jour immédiatement
     const log = document.getElementById('battle-log');
@@ -3398,15 +3431,15 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     const srcPortrait = card?.querySelector('.fighter-portrait');
     if (!srcPortrait) {
       _queuePassiveBigBanner(text);
-      // Même sans portrait à animer, on respecte le même délai après le retrait
-      // (la petite bannière centrale reste affichée ~1500ms, cf. _runPassiveBigBannerQueue)
+      // Même sans portrait à animer, on respecte le même enchaînement temporel
       setTimeout(() => {
-        if (opts.onRetreat) {
-          setTimeout(() => { opts.onRetreat(); _combatAnimDone(); }, 1000);
-        } else {
+        opts.onFxStart?.();
+        setTimeout(() => {
+          opts.onImpact?.();
+          if (opts.onRetreat) { opts.onRetreat(); }
           _combatAnimDone();
-        }
-      }, 1500);
+        }, 1000);
+      }, 500);
       return;
     }
 
@@ -3489,8 +3522,17 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       }, 1248);
     }
 
+    // Phase 2c — ~1s avant que la bannière ne commence à repartir : lancement
+    // du FX visuel propre au passif (dure ~1000ms, cf. _spawnPassiveFx), pour
+    // qu'il se termine PILE au moment où la bannière part (phase 3, 1950ms).
+    if (opts.onFxStart) setTimeout(() => opts.onFxStart(), 950);
+
     // Phase 3 — retour (600ms) à 2500ms
     setTimeout(() => {
+      // Le FX vient de se terminer : c'est ICI, et seulement ici, qu'on fait
+      // apparaître les chiffres de dégâts/soin ET qu'on met à jour la barre
+      // de vie — les deux strictement en même temps.
+      opts.onImpact?.();
       banner.style.opacity  = '0';
       if (banner2) banner2.style.opacity = '0';
       clone.style.transition = [
@@ -3515,7 +3557,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       srcPortrait.style.opacity = '';
       if (opts.onRetreat) {
         // La bannière a totalement disparu : on attend encore 1s avant d'appliquer
-        // le changement de PV/statut, puis on libère la file d'animation.
+        // le changement de statut restant (icônes...), puis on libère la file.
         setTimeout(() => { opts.onRetreat(); _combatAnimDone(); }, 1000);
       } else {
         _combatAnimDone();
@@ -3599,9 +3641,8 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       _combatAnimDone(); return;
     }
 
-    // Positions AVANT animation
+    // Position de l'attaquant AVANT animation (sert au test de fiabilité ci-dessous)
     const srcRect = srcPortrait.getBoundingClientRect();
-    const tgtRect = (tgtPortrait || targetCard).getBoundingClientRect();
 
     if (srcRect.width === 0) {
       _resolveImpact(targetCard, target, result);
@@ -3609,11 +3650,6 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       applySnapshotAndUpdate(attacker, attackerHpSnapshot);
       setTimeout(_combatAnimDone, 100); return;
     }
-
-    // Déplacement en coordonnées écran → converti en unités locales
-    // Le portrait est déjà en position normale, on anime via transform
-    const dx = (tgtRect.left + tgtRect.width  / 2) - (srcRect.left + srcRect.width  / 2);
-    const dy = (tgtRect.top  + tgtRect.height / 2) - (srcRect.top  + srcRect.height / 2);
 
     // Stopper l'animation breathe pendant notre animation
     srcPortrait.style.animation = 'none';
@@ -3632,6 +3668,14 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
 
     // Phase 2 — charge vers la cible (500ms)
     setTimeout(() => {
+      // Recalcul de la position de la cible à l'instant T (et pas au tout début
+      // de l'animation, ~500ms plus tôt) : si la mise en page a légèrement
+      // bougé entre-temps (autre élément d'UI qui se met à jour, etc.), le
+      // portrait vole vers la position réelle et actuelle de sa cible.
+      const freshSrcRect = srcPortrait.getBoundingClientRect();
+      const freshTgtRect = (tgtPortrait || targetCard).getBoundingClientRect();
+      const dx = (freshTgtRect.left + freshTgtRect.width  / 2) - (freshSrcRect.left + freshSrcRect.width  / 2);
+      const dy = (freshTgtRect.top  + freshTgtRect.height / 2) - (freshSrcRect.top  + freshSrcRect.height / 2);
       srcPortrait.style.transition = 'transform 390ms cubic-bezier(.6,0,1,.4), box-shadow 234ms ease';
       srcPortrait.style.transform  = `translate(${dx}px, ${dy}px) scale(0.5)`;
       srcPortrait.style.boxShadow  = '0 0 6px rgba(255,140,200,.2)';

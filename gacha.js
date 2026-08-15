@@ -175,13 +175,18 @@ const WBGachaSystem = (() => {
     const ev = bannerId === 'banner_event' ? (WBGameState.getActiveEvent?.() ?? null) : null;
     const dropRates = ev?.bannerRates || cfg.dropRates || {};
     const rarities  = WBGameDatabase.RARITIES;
-    const roll = Math.random() * 100;
-    let cumulative = 0;
     const order = ['mythic', 'legendary', 'epic', 'rare', 'uncommon', 'common'];
-    for (const r of order) {
-      const weight = dropRates[r] !== undefined ? dropRates[r] : (rarities[r]?.gachaWeight || 0);
-      cumulative += weight;
-      if (roll < cumulative) return r;
+    const weights = order.map(r => Math.max(0, dropRates[r] !== undefined ? dropRates[r] : (rarities[r]?.gachaWeight || 0)));
+    const total = weights.reduce((a, b) => a + b, 0);
+    if (total <= 0) return 'common';
+    // Normalisation : garantit que chaque rareté obtient EXACTEMENT sa part
+    // proportionnelle (poids / somme totale), même si la somme des poids
+    // saisis n'est pas pile 100 (ex: 99.5) — plus de zone orpheline possible.
+    const roll = Math.random() * total;
+    let cumulative = 0;
+    for (let i = 0; i < order.length; i++) {
+      cumulative += weights[i];
+      if (roll < cumulative) return order[i];
     }
     return 'common';
   }
