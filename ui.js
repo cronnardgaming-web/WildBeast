@@ -212,10 +212,14 @@ const WBGameUI = (() => {
     const tutorialDone = player.tutorialDone;
 
     if (!tutorialDone) {
-      // Première ouverture : écran titre → tutoriel → récompenses connexion
+      // Première ouverture : écran titre → tutoriel → Chapitre 1 Stage 1 (avec dialogue) → récompenses connexion
       _showTitleScreen(() => {
         _runTutorial(() => {
-          _launchDailyRewards();
+          const state0 = WBGameState.get();
+          const ch0    = state0.config.storyMode?.chapters?.[0];
+          _launchStoryStage(0, 1, ch0, () => {
+            _launchDailyRewards();
+          });
         });
       });
     } else {
@@ -716,7 +720,7 @@ const WBGameUI = (() => {
         <span class="nav-lbl">COMBAT</span>
       </div>
       <div class="nav-new-btn" id="nav-gacha-btn" data-screen="gacha">
-        <span class="nav-ico">🤝</span><span class="nav-lbl">SPONSORING</span>
+        <span class="nav-ico">📡</span><span class="nav-lbl">SIGNAL</span>
       </div>
       <div class="nav-new-btn" data-screen="shop">
         <span class="nav-ico">🛍️</span><span class="nav-lbl">SHOP</span>
@@ -726,7 +730,7 @@ const WBGameUI = (() => {
       </div>
     `;
 
-    // Bouton Sponsoring (gacha) — verrouillé si feature pas débloquée
+    // Bouton Signal (gacha) — verrouillé si feature pas débloquée
     const gachaBtn = document.getElementById('nav-gacha-btn');
     const gachaUnlocked = WBGameState.isFeatureUnlocked?.('gacha') ?? true;
     if (!gachaUnlocked && gachaBtn) {
@@ -735,7 +739,7 @@ const WBGameUI = (() => {
     }
     gachaBtn?.addEventListener('click', () => {
       if (!WBGameState.isFeatureUnlocked?.('gacha')) {
-        _showToast('🔒 Sponsoring disponible au Chapitre 2, Stage 5', 'info');
+        _showToast('🔒 Signal disponible au Chapitre 2, Stage 5', 'info');
         return;
       }
       showScreen('gacha');
@@ -1104,15 +1108,15 @@ const WBGameUI = (() => {
     });
   }
 
-  function _launchStoryStage(ci, stage, ch) {
+  function _launchStoryStage(ci, stage, ch, onDone) {
     const isNarr = NARRATIVE_STAGES.includes(stage);
     const dlg    = ch?.dialogues?.[stage];
 
     if (isNarr && dlg?.text) {
       // Afficher le dialogue narratif avant le combat
-      _showStoryDialogue(dlg, () => _startStoryBattle(ci, stage));
+      _showStoryDialogue(dlg, () => _startStoryBattle(ci, stage, onDone));
     } else {
-      _startStoryBattle(ci, stage);
+      _startStoryBattle(ci, stage, onDone);
     }
   }
 
@@ -1156,14 +1160,14 @@ const WBGameUI = (() => {
     btn?.addEventListener('click', advance);
   }
 
-  function _startStoryBattle(ci, stage) {
+  function _startStoryBattle(ci, stage, onDone) {
     // Difficulté : +5% stats ennemies par stage
     const difficulty = 1 + (stage - 1) * 0.05;
     showScreen('combat');
     setTimeout(() => {
       _launchCombat({ mode: 'storyMode', storyChapter: ci, storyStage: stage, difficulty });
       // Après victoire : marquer le stage complété
-      _storyPendingStage = { ci, stage };
+      _storyPendingStage = { ci, stage, onDone };
     }, 100);
   }
 
@@ -3059,9 +3063,10 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       } else {
         // Mode histoire : marquer le stage complété
         if (_storyPendingStage) {
-          const { ci, stage } = _storyPendingStage;
+          const { ci, stage, onDone } = _storyPendingStage;
           _storyPendingStage = null;
           WBGameState.completeStoryStage(ci, stage);
+          onDone?.();
           // Afficher dialogue post si stage narratif avec text2
           const ch  = WBGameState.get().config.storyMode?.chapters?.[ci];
           const dlg = ch?.dialogues?.[stage];
@@ -4068,6 +4073,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       // Capturer mode et chapitre AVANT le reset de _battle
       const battleMode    = _battle?.mode;
       const battleChapter = _battle?.storyChapter ?? _storyCurrentChapter;
+      const battleStage   = _battle?.storyStage;
 
       overlay.style.opacity = '0';
       setTimeout(() => {
@@ -4076,7 +4082,16 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         _battle = null;
         WBAudioSystem.playGlobal();
 
-        if (battleMode === 'storyMode') {
+        if (battleMode === 'storyMode' && battleChapter === 1 && battleStage === 5) {
+          // Fin du Chapitre 2 / Stage 5 : Thomas introduit le Signal directement sur son écran
+          showScreen('gacha');
+          renderGacha();
+          _showStoryDialogue({
+            speaker: 'Thomas',
+            portrait: WBGameState.get().config.tutorial?.narratorPortrait || '',
+            text: "Dépense tes Essences Sauvages ici pour attirer des animaux. Tu peux aussi utiliser tes Dollars pour demander des équipements afin d'améliorer tes animaux.",
+          });
+        } else if (battleMode === 'storyMode') {
           // Mode Histoire → retour au chapitre en cours
           showScreen('story-chapter');
           renderStoryChapter(battleChapter);

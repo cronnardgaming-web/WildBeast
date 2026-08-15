@@ -5914,7 +5914,7 @@ const WBAdminPanel = (() => {
     { key: 'team-hub',        label: '🎒 Menu Préparation' },
     { key: 'collection',      label: '✨ Collection' },
     { key: 'team',            label: '🧩 Composition d\'équipe' },
-    { key: 'gacha',           label: '🤝 Sponsoring (Gacha)' },
+    { key: 'gacha',           label: '📡 Signal (Gacha)' },
     { key: 'equip',           label: '⚔️ Équipements' },
     { key: 'inventory',       label: '🎒 Inventaire' },
     { key: 'shop',            label: '🛍️ Shop' },
