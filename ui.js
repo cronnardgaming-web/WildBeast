@@ -3148,7 +3148,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         targetIds.forEach(id => {
           const targetCard = document.getElementById(`fighter-${id}`);
           const dmg = damageMap[id];
-          if (dmg != null) _spawnFloatText(targetCard, `-${dmg}`, 'float-passive-dmg', 0);
+          if (dmg != null) { _spawnImpactGlow(targetCard, 'dmg'); _spawnFloatText(targetCard, `-${dmg}`, 'float-passive-dmg', 0, true); }
           const c = _findCombatantById(id);
           if (!c || hpSnapshot[id] === undefined) return;
           const saved = c.currentHp;
@@ -3170,7 +3170,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       };
       onImpact = () => {
         const healedCard = document.getElementById(`fighter-${healedId}`);
-        if (amount != null) _spawnFloatText(healedCard, `+${amount}`, 'float-passive-heal', 0);
+        if (amount != null) { _spawnImpactGlow(healedCard, 'heal'); _spawnFloatText(healedCard, `+${amount}`, 'float-passive-heal', 0, true); }
         const healed = _findCombatantById(healedId);
         if (healed && hpAfter !== undefined) {
           const saved = healed.currentHp;
@@ -3255,7 +3255,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       // apparaissent ENSEMBLE juste après, pas avant.
       setTimeout(() => {
         const targetCard = document.getElementById(`fighter-${targetId}`);
-        if (dmg != null && targetCard) _spawnFloatText(targetCard, `-${dmg}`, 'float-passive-dmg', 0);
+        if (dmg != null && targetCard) _spawnFloatText(targetCard, `-${dmg}`, 'float-passive-dmg', 0, true);
         const c = _findCombatantById(targetId);
         if (c && hpAfterCounter !== undefined) {
           const saved = c.currentHp;
@@ -3328,7 +3328,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       // Tick de poison : petite animation sur la victime, SANS portrait au centre
       const portrait = card.querySelector('.fighter-portrait');
       // Chiffre flottant
-      if (data.amount != null) _spawnFloatText(card, `-${data.amount}`, 'float-passive-poison', 0);
+      if (data.amount != null) _spawnFloatText(card, `-${data.amount}`, 'float-passive-poison', 0, true);
       WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.hitNormal);
       // Petite animation poison sur la carte (teinte violette pulsante)
       if (portrait) {
@@ -3736,7 +3736,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     targetPortrait?.classList.add('hit-flash', result.critical ? 'shake-big' : 'shake-hit');
     setTimeout(() => targetPortrait?.classList.remove('hit-flash', 'shake-big', 'shake-hit'), 480);
 
-    _spawnFloatText(targetCard, `-${result.damage}`, result.critical ? 'float-dmg float-crit-dmg' : 'float-dmg', 0);
+    _spawnFloatText(targetCard, `-${result.damage}`, result.critical ? 'float-dmg float-crit-dmg' : 'float-dmg', 0, true);
 
     if (result.critical) {
       _spawnFloatText(targetCard, 'CRITIQUE !', 'float-crit-label', 1);
@@ -3752,13 +3752,23 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   }
 
   /** Affiche un texte flottant temporaire au-dessus d'une carte de combattant */
-  function _spawnFloatText(card, text, cls, stack = 0) {
+  function _spawnFloatText(card, text, cls, stack = 0, big = false) {
     const el = document.createElement('div');
     el.className = `float-text ${cls}`;
     el.style.setProperty('--stack', stack);
     el.textContent = text;
     card.appendChild(el);
-    setTimeout(() => el.remove(), 1200);
+    setTimeout(() => el.remove(), big ? 1920 : 1200); // 1920 = 1200 × 1.6 (durée +60%)
+  }
+
+  /** Petit brillant coloré synchronisé pile avec l'affichage d'un chiffre de dégâts/soin */
+  function _spawnImpactGlow(card, variant) {
+    const portrait = card?.querySelector('.fighter-portrait');
+    if (!portrait) return;
+    const glow = document.createElement('div');
+    glow.className = `impact-glow impact-glow-${variant}`;
+    portrait.appendChild(glow);
+    setTimeout(() => glow.remove(), 1760);
   }
 
   /**

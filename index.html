@@ -1215,6 +1215,21 @@
 
   .passive-fx{ position:absolute; inset:0; pointer-events:none; z-index:15; border-radius:50%; }
 
+  /* Petit brillant synchronisé PILE avec l'affichage du chiffre de dégâts/soin
+     (contrairement à .passive-fx-* ci-dessous, qui se joue ~1s AVANT le chiffre) */
+  .impact-glow{
+    position:absolute; inset:0; pointer-events:none; z-index:14; border-radius:50%;
+    animation:impactGlow 1.76s ease-out forwards;
+  }
+  @keyframes impactGlow{
+    0%   { opacity:0;  box-shadow:0 0 0px 0px var(--glow-color, #4ade80); }
+    12%  { opacity:1;  box-shadow:0 0 22px 6px var(--glow-color, #4ade80); }
+    70%  { opacity:1;  box-shadow:0 0 14px 3px var(--glow-color, #4ade80); }
+    100% { opacity:0;  box-shadow:0 0 0px 0px var(--glow-color, #4ade80); }
+  }
+  .impact-glow-heal{ --glow-color:#4ade80; } /* vert — Régénération */
+  .impact-glow-dmg { --glow-color:#60A5FA; } /* bleu — Tsunami */
+
   /* Fanatisme : vague de dégâts (façon "tsunami") balayant la cible */
   .passive-fx-wave{
     background:radial-gradient(circle, rgba(244,194,103,.55), transparent 70%);
@@ -1406,8 +1421,8 @@
     75%{ opacity:1; transform:translate(-50%, -34px) scale(1); }
     100%{ opacity:0; transform:translate(-50%, -46px) scale(.95); }
   }
-  .float-dmg{ font-size:1.05rem; color:#fff; }
-  .float-crit-dmg{ font-size:1.3rem; color:var(--accent); }
+  .float-dmg{ font-size:2.1rem; color:#fff; animation-duration:1.76s; }
+  .float-crit-dmg{ font-size:2.6rem; color:var(--accent); animation-duration:1.76s; }
   .float-crit-label{ font-size:.68rem; color:var(--accent); }
   .float-evade{ font-size:.8rem; color:var(--text-dim); }
   .float-levelup{ font-size:1.05rem; color:#ffd780; }
@@ -1418,9 +1433,9 @@
   .float-mult-immune{ color:#9ca3af; }
   .float-passive{ font-size:.72rem; color:#FFC066; letter-spacing:.04em; }
   /* Chiffres flottants colorés pour les PV modifiés par passif */
-  .float-passive-heal  { font-size:.95rem; color:#4ade80; font-weight:900; } /* vert  — Régénération */
-  .float-passive-dmg   { font-size:.95rem; color:#f87171; font-weight:900; } /* rouge — Fanatisme, Contre-Attaque */
-  .float-passive-poison{ font-size:.95rem; color:#FFA733; font-weight:900; } /* violet — Poison */
+  .float-passive-heal  { font-size:1.9rem; color:#4ade80; font-weight:900; animation-duration:1.76s; } /* vert  — Régénération */
+  .float-passive-dmg   { font-size:1.9rem; color:#f87171; font-weight:900; animation-duration:1.76s; } /* rouge — Fanatisme, Contre-Attaque */
+  .float-passive-poison{ font-size:1.9rem; color:#FFA733; font-weight:900; animation-duration:1.76s; } /* violet — Poison */
   @keyframes poisonTickFlash{
     0%  { filter:brightness(1) saturate(1); }
     25% { filter:brightness(.65) saturate(3) hue-rotate(210deg); box-shadow:0 0 20px rgba(168,85,247,.95),0 0 40px rgba(168,85,247,.4); }
