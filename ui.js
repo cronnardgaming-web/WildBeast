@@ -998,10 +998,10 @@ const WBGameUI = (() => {
   const NARRATIVE_STAGES = [1, 5, 8, 10];
 
   const STAGE_NARRATIVE_LABELS = {
-    1:  { icon: '🌅', label: 'Découverte'    },
-    5:  { icon: '🌀', label: 'Questionnement' },
-    8:  { icon: '⚡', label: 'Compréhension'  },
-    10: { icon: '🏁', label: 'Résolution'     },
+    1:  { icon: '📖', label: 'Découverte'    },
+    5:  { icon: '📖', label: 'Questionnement' },
+    8:  { icon: '📖', label: 'Compréhension'  },
+    10: { icon: '📖', label: 'Résolution'     },
   };
 
   let _storyCurrentChapter = 0; // index du chapitre affiché
@@ -1080,7 +1080,6 @@ const WBGameUI = (() => {
         ${isDone ? '<span class="story-stage-check">✓</span>' : ''}
         ${isNarr && !isDone ? `<span class="story-stage-icon">${nl.icon}</span>` : ''}
         <span class="story-stage-num">${stage}</span>
-        ${isNarr ? `<span style="font-size:.55rem;color:#a78bfa;text-align:center;line-height:1.1">${nl.label}</span>` : ''}
       </div>`;
     }).join('');
 
