@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>WildBeast Chronicles</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1945,10 +1945,10 @@
 
   /* ── Nouvelle navigation ── */
   .app-nav-new{
-    flex-shrink:0; height:64px;
+    flex-shrink:0; min-height:64px;
     background:linear-gradient(180deg,rgba(8,3,18,.0) 0%,rgba(8,3,18,.97) 100%);
     display:flex; align-items:flex-end; justify-content:space-between;
-    padding:0 6px 10px; gap:4px;
+    padding:0 6px calc(10px + env(safe-area-inset-bottom)); gap:4px;
     position:relative;
   }
   .nav-new-btn{
