@@ -828,6 +828,7 @@ const WBAdminPanel = (() => {
           <div style="display:flex;gap:8px;align-items:center">
             <select class="sort-select" id="char-list-sort" onchange="WBAdminPanel._sortCharList(this.value)">
               <option value="">Trier…</option>
+              <option value="id">ID A→Z</option>
               <option value="name">Nom A→Z</option>
               <option value="rarity">Rareté ↓</option>
             </select>
@@ -850,7 +851,8 @@ const WBAdminPanel = (() => {
     const state = WBGameState.get();
     const rarityIndex = (r) => { const idx = RARITIES.indexOf(r); return idx === -1 ? 0 : idx; };
     const sorted = [...state.characters];
-    if (key === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name));
+    if (key === 'id') sorted.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+    else if (key === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name));
     else if (key === 'rarity') sorted.sort((a, b) => rarityIndex(b.rarity) - rarityIndex(a.rarity) || a.name.localeCompare(b.name));
     WBGameState.reorderCharDefs(sorted.map(c => c.id));
     switchTab('characters');
