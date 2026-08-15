@@ -402,6 +402,7 @@ const WBGameUI = (() => {
         _battle = WBCombatEngine.start(_onBattleEvent, { mode: 'tutorial' });
         if (!_battle) { _showToast('Impossible de lancer le combat du tutoriel.', 'error'); return; }
         _combatInProgress = true;
+        document.body.classList.add('battle-active');
         lobby.style.display      = 'none';
         battleArea.style.display = 'block';
         WBAudioSystem.playCombat?.();
@@ -982,10 +983,6 @@ const WBGameUI = (() => {
         <span class="hud-icon">⚡</span>
         <span class="hud-val">${cfg.energy.enabled ? `${player.energy.current}/${player.energy.max}` : '∞'}</span>
         ${cfg.energy.enabled ? `<div class="hud-bar"><div class="hud-bar-fill" style="width:${energyPct}%"></div></div>` : ''}
-      </div>
-      <div class="hud-item">
-        <span class="hud-icon">🏆</span>
-        <span class="hud-val">${player.stats.totalVictories}V</span>
       </div>
     `;
     _updateNavDots();
@@ -2833,6 +2830,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       return;
     }
 
+    document.body.classList.add('battle-active');
     lobby.style.display = 'none';
     battleArea.style.display = 'block';
 
@@ -3991,6 +3989,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         overlay.remove();
         WBCombatEngine.reset();
         _battle = null;
+        document.body.classList.remove('battle-active');
         WBAudioSystem.playGlobal();
         _showCombatSelect();
       }, 500);
@@ -4182,6 +4181,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         overlay.remove();
         WBCombatEngine.reset();
         _battle = null;
+        document.body.classList.remove('battle-active');
         WBAudioSystem.playGlobal();
 
         if (battleMode === 'storyMode' && battleChapter === 1 && battleStage === 5) {

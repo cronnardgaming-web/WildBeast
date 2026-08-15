@@ -124,7 +124,18 @@
       margin:0;
       border-left:none;
       border-right:none;
+      height:100dvh; /* hauteur RÉELLEMENT visible sur mobile (exclut les barres du navigateur/du téléphone), 100vh les inclut parfois à tort */
     }
+    /* Pendant un combat, l'en-tête libère sa place pour laisser le maximum
+       de hauteur disponible à la scène de combat (3 alliées + 3 ennemies). */
+    body.battle-active .app-header{ display:none; }
+
+    /* Combat : les 3 combattants d'un même camp restent TOUJOURS sur une
+       seule ligne (jamais de retour à la ligne), quelle que soit la largeur
+       exacte du téléphone — les cartes rétrécissent plutôt que de wrapper. */
+    .battle-fighters{ flex-wrap:nowrap; gap:5px; }
+    .fighter-card{ min-width:0; max-width:none; flex:1 1 0; padding:8px 3px 6px; gap:4px; }
+    .fighter-portrait{ width:50px; height:50px; font-size:1.05rem; }
   }
 
   /* ── HEADER ── */
@@ -1169,9 +1180,6 @@
     animation-delay:var(--breathe-delay, 0ms);
   }
   .fighter-card.defeated .fighter-portrait{ animation:none; }
-  @media (max-width:380px){
-    .fighter-portrait{ width:58px; height:58px; font-size:1.2rem; }
-  }
 
   /* ============================================================
      PASSIFS EN COMBAT — bannière de nom + petites animations
