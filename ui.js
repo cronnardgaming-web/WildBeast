@@ -3757,15 +3757,15 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     _spawnFloatText(targetCard, `-${result.damage}`, result.critical ? 'float-dmg float-crit-dmg' : 'float-dmg', 0, true);
 
     if (result.critical) {
-      _spawnFloatText(targetCard, 'CRITIQUE !', 'float-crit-label', 1);
+      _spawnFloatText(targetCard, 'CRITIQUE !', 'float-crit-label', 1, true);
     }
 
     if (result.multiplier >= 2.0) {
-      _spawnFloatText(targetCard, `×${_formatMult(result.multiplier)} Super efficace !`, 'float-mult float-mult-super', result.critical ? 2 : 1);
+      _spawnFloatText(targetCard, `×${_formatMult(result.multiplier)} Super efficace !`, 'float-mult float-mult-super', result.critical ? 2 : 1, true);
     } else if (result.multiplier > 0 && result.multiplier <= 0.5) {
-      _spawnFloatText(targetCard, `×${_formatMult(result.multiplier)} Peu efficace...`, 'float-mult float-mult-low', result.critical ? 2 : 1);
+      _spawnFloatText(targetCard, `×${_formatMult(result.multiplier)} Peu efficace...`, 'float-mult float-mult-low', result.critical ? 2 : 1, true);
     } else if (result.multiplier === 0) {
-      _spawnFloatText(targetCard, 'Aucun effet !', 'float-mult float-mult-immune', result.critical ? 2 : 1);
+      _spawnFloatText(targetCard, 'Aucun effet !', 'float-mult float-mult-immune', result.critical ? 2 : 1, true);
     }
   }
 
