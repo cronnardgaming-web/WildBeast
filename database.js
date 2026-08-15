@@ -49,6 +49,25 @@ const WBGameDatabase = (() => {
       // même niveau. 0 = désactivé (comportement historique). 1 = les ennemis
       // absorbent l'intégralité de l'avantage du joueur (parité totale).
       adaptiveScalingFactor: 0.6,
+      // ── Mode Trophée (score attack) ──────────────────────────────────────
+      // Vagues d'ennemis Niveau 1 à l'infini pendant un nombre de tours fixe.
+      // Les ennemis n'attaquent jamais : seule l'équipe du joueur agit.
+      // Score = 1 point par point de dégâts infligé (attaque normale + dégâts
+      // de passif type Tsunami/Venin), + un bonus fixe par ennemi vaincu.
+      // Aucun XP/Or/Essence Sauvage gagné sur ce mode — uniquement le score.
+      trophy: {
+        rounds:         15,   // Nombre de tours (chaque tour = les 3 créatures agissent une fois)
+        killBonus:      50,   // Points bonus par ennemi vaincu (en plus des dégâts infligés)
+        enemyTeamSize:  3,    // Nombre d'ennemis affichés simultanément
+        // Paliers de récompense personnels (nombre libre, triés du plus petit
+        // au plus grand). Chaque palier n'est débloqué qu'une seule fois.
+        rewardTiers: [
+          { id: 'trophy_tier_1', score: 2000,  reward: { type: 'gold',     amount: 500  } },
+          { id: 'trophy_tier_2', score: 5000,  reward: { type: 'gold',     amount: 1500 } },
+          { id: 'trophy_tier_3', score: 10000, reward: { type: 'crystals', amount: 100  } },
+          { id: 'trophy_tier_4', score: 20000, reward: { type: 'crystals', amount: 300  } },
+        ],
+      },
       // ── Mode Odyssée (histoire) ────────────────────────────────────────────
       story: {
         subLevelsPerWorld:   25,    // Nombre de sous-niveaux par monde
@@ -107,6 +126,7 @@ const WBGameDatabase = (() => {
         line:       20,
         fullRandom: 10,
         arena:      15,
+        trophy:     15,
       },
     },
     audio: {
@@ -712,7 +732,7 @@ const WBGameDatabase = (() => {
 
   const DEFAULT_PLAYER = {
     id: "player_local",
-    name: "Séducteur",
+    name: "Ranger",
     level: 1,
     experience: 0,
     currency: { crystals: 0, gold: 0 },
@@ -729,6 +749,10 @@ const WBGameDatabase = (() => {
     },
     storyMode: {           // Progression Mode Histoire
       // { [chapterIdx]: { completedStages: [1,2,...], highestStage: 3 } }
+    },
+    trophy: {               // Progression Mode Trophée (score attack)
+      bestScore: 0,          // Meilleur score jamais atteint
+      tiersReached: [],       // IDs des paliers de récompense déjà débloqués (une seule fois chacun)
     },
     dailyLogin: {           // Progression des cycles de récompense de connexion quotidienne
       progress: {},         // { [cycleId]: { currentDay: 1, lastClaimDate: 'YYYY-MM-DD'|null } }

@@ -208,6 +208,12 @@ const WBCombatEngine = (() => {
           message: `${actor.name} active Fanatisme !`,
           extra: { targetIds: opponents.map(o => o.instanceId), damageMap },
         });
+        if (_battle.mode === 'trophy' && !actor.isEnemy) {
+          opponents.forEach(o => {
+            _addTrophyScore(damageMap[o.instanceId]);
+            if (!o.alive) _replaceTrophyEnemy(o);
+          });
+        }
       }
     }
 
@@ -252,6 +258,61 @@ const WBCombatEngine = (() => {
           });
         }
       }
+    }
+  }
+
+  /** Mode Trophée : ajoute des points au score courant du run */
+  function _addTrophyScore(amount) {
+    if (!_battle || _battle.mode !== 'trophy' || !amount) return;
+    _battle.trophyScore = (_battle.trophyScore || 0) + Math.max(0, Math.round(amount));
+  }
+
+  /**
+   * Mode Trophée : un ennemi vient d'être vaincu — bonus de points, puis
+   * remplacement IMMÉDIAT par un nouvel ennemi Niveau 1 au même emplacement
+   * (le joueur voit toujours cfg.trophy.enemyTeamSize adversaires en face).
+   */
+  function _replaceTrophyEnemy(deadEnemy) {
+    if (!_battle || _battle.mode !== 'trophy') return;
+    const state = WBGameState.get();
+    const trophyCfg = state.config.combat.trophy || {};
+    _addTrophyScore(trophyCfg.killBonus ?? 50);
+
+    const idx = _battle.enemyTeam.findIndex(e => e.instanceId === deadEnemy.instanceId);
+    if (idx === -1) return;
+
+    const chars = state.characters.filter(c => _isEligibleWildChar(c, state.player));
+    if (chars.length === 0) return;
+    const charDef = _pickWeightedRandomChar(chars, state.config.combat.enemyRarityWeights, 1);
+    const fakeInst = {
+      instanceId: `trophy_enemy_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+      charId: charDef.id, level: 1, awakening: 0, equipment: null,
+    };
+    const fresh = _buildCombatant(fakeInst, charDef, true);
+    _battle.enemyTeam[idx] = fresh;
+    _emit('trophyEnemyReplaced', { oldInstanceId: deadEnemy.instanceId, newCombatant: fresh, score: _battle.trophyScore });
+  }
+
+  /**
+   * Mode Trophée : les ennemis n'ont jamais leur propre tour, donc le tic de
+   * poison habituel (déclenché en tout début du tour du combattant affecté,
+   * cf. _tickPoison) ne se produirait jamais pour eux. On le simule ici, à la
+   * fin de chaque manche, pour que Venin compte bien dans le score.
+   */
+  function _tickTrophyEnemyPoison(enemy) {
+    const poison = (enemy.statusEffects || []).find(s => s.type === 'poison');
+    if (!poison) return;
+    const dmg = Math.max(1, Math.round(enemy.maxHp * (poison.damagePercentMaxHp / 100)));
+    enemy.currentHp = Math.max(0, enemy.currentHp - dmg);
+    _addTrophyScore(dmg);
+    poison.turnsLeft--;
+    _battle.log.push(`☠️ ${enemy.name} subit ${dmg} dégâts de poison.`);
+    if (enemy.currentHp <= 0) {
+      enemy.alive = false;
+      enemy.currentHp = 0;
+      _replaceTrophyEnemy(enemy);
+    } else if (poison.turnsLeft <= 0) {
+      _removeStatus(enemy, 'poison');
     }
   }
 
@@ -926,6 +987,25 @@ const WBCombatEngine = (() => {
         };
         enemyTeam.push(_buildCombatant(fakeInst, def, true));
       }
+    } else if (mode === 'trophy') {
+      // Mode Trophée : vague initiale d'ennemis Niveau 1, tous types confondus,
+      // mêmes règles d'éligibilité (formes de base + débloquées) et de rareté
+      // que le reste du jeu. Remplacement immédiat géré en cours de combat.
+      const trophyCfg = cfg.combat.trophy || {};
+      const chars = state.characters.filter(c => _isEligibleWildChar(c, state.player));
+      if (chars.length === 0) {
+        _emit('error', { message: "Aucune créature disponible pour le mode Trophée !" });
+        return null;
+      }
+      const size = Math.max(1, trophyCfg.enemyTeamSize || 3);
+      enemyTeam = Array.from({ length: size }, (_, i) => {
+        const def = _pickWeightedRandomChar(chars, cfg.combat.enemyRarityWeights, 1);
+        const fakeInst = {
+          instanceId: `trophy_enemy_${Date.now()}_${i}`,
+          charId: def.id, level: 1, awakening: 0, equipment: null,
+        };
+        return _buildCombatant(fakeInst, def, true);
+      });
     } else {
       // 'random', 'fullRandom' — génération ennemie standard
       const esCfg = (cfg.game || {}).enemyTeamSize || {};
@@ -972,6 +1052,7 @@ const WBCombatEngine = (() => {
       result:       null,
       capturable:   [],
       rewards:      null,
+      trophyScore:  mode === 'trophy' ? 0 : null,
     };
 
     // Mettre à jour les stats de combat
@@ -1004,7 +1085,9 @@ const WBCombatEngine = (() => {
    * En cas d'égalité de vitesse, l'ordre est départagé aléatoirement.
    */
   function _buildTurnOrder() {
-    const all = [..._battle.playerTeam, ..._battle.enemyTeam].filter(c => c.alive);
+    const all = _battle.mode === 'trophy'
+      ? _battle.playerTeam.filter(c => c.alive)
+      : [..._battle.playerTeam, ..._battle.enemyTeam].filter(c => c.alive);
     return all
       .map(c => ({ instanceId: c.instanceId, isEnemy: c.isEnemy, spd: c.spd, _r: Math.random() }))
       .sort((a, b) => (b.spd - a.spd) || (a._r - b._r))
@@ -1042,6 +1125,17 @@ const WBCombatEngine = (() => {
     }
 
     if (_battle.turnIndex >= _battle.turnOrder.length) {
+      if (_battle.mode === 'trophy') {
+        // Les ennemis n'ont jamais leur propre tour : on tique leur poison
+        // (s'ils en ont) ici, à la fin de chaque manche, pour que Venin
+        // continue bien à compter dans le score comme demandé.
+        _battle.enemyTeam.filter(e => e.alive).forEach(e => _tickTrophyEnemyPoison(e));
+        const trophyCfg = WBGameState.get().config.combat.trophy || {};
+        if (_battle.turn >= (trophyCfg.rounds || 15)) {
+          _endBattle('trophy_end');
+          return;
+        }
+      }
       _battle.turn++;
       _startRound();
       return;
@@ -1127,7 +1221,12 @@ const WBCombatEngine = (() => {
     const result = _executeAttack(attacker, target);
     _logAction(attacker, target, result);
     _emit('playerAttack', { attacker, target, result });
-    if (!result.evaded && target.alive && result.damage > 0) {
+
+    if (_battle.mode === 'trophy') {
+      if (!result.evaded && target.isEnemy && result.damage > 0) _addTrophyScore(result.damage);
+      if (!target.alive) _replaceTrophyEnemy(target);
+      // Pas de Contre-Attaque : les ennemis n'attaquent jamais dans ce mode.
+    } else if (!result.evaded && target.alive && result.damage > 0) {
       _processPostDamageCounter(target, attacker);
     }
 
@@ -1314,6 +1413,7 @@ const WBCombatEngine = (() => {
    */
   function _checkBattleEnd() {
     if (!_battle) return true;
+    if (_battle.mode === 'trophy') return false; // fin gérée par le budget de tours, cf. _advanceTurn
 
     const playerAlive = _battle.playerTeam.some(c => c.alive);
     const enemyAlive  = _battle.enemyTeam.some(c => c.alive);
@@ -1342,6 +1442,16 @@ const WBCombatEngine = (() => {
     // que le combat est terminé (gagné ou perdu).
     if (_battle.restoreTeam) {
       WBGameState.setTeam(_battle.restoreTeam);
+    }
+
+    // ── Mode Trophée : fin dédiée, aucun XP/Or/Essence Sauvage — uniquement le
+    // score et les paliers de récompense personnels franchis pour la première fois.
+    if (_battle.mode === 'trophy') {
+      const finalScore = _battle.trophyScore || 0;
+      const newlyReached = WBGameState.registerTrophyScore?.(finalScore) || [];
+      _battle.rewards = { trophyScore: finalScore, newlyReachedTiers: newlyReached };
+      _emit(result === 'trophy_end' ? 'trophyEnd' : result, { rewards: _battle.rewards, battle: _battle });
+      return;
     }
 
     const state  = WBGameState.get();

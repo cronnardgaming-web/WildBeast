@@ -1078,6 +1078,7 @@ const WBGameState = (() => {
       case 'saga':     return chapterDone(3);            // Fin Chap.4
       case 'tournee':  return chapterDone(2);            // Fin Chap.3
       case 'grandgala':return chapterDone(4);            // Fin Chap.5
+      case 'trophy':   return chapterDone(5);            // Fin Chap.6
       default:         return true;
     }
   }
@@ -1428,6 +1429,35 @@ const WBGameState = (() => {
     if (_state.player.dailyLogin?.progress) delete _state.player.dailyLogin.progress[id];
     _notify('dailyLoginCycleRemoved');
     _autoSave();
+  }
+
+  // ─── MODE TROPHÉE (score attack) ────────────────────────────────────────────
+
+  /**
+   * À appeler en fin de run Trophée avec le score final atteint.
+   * Met à jour le meilleur score du joueur si dépassé, et débloque (une seule
+   * fois chacun) tous les paliers de récompense franchis pour la première fois.
+   * @param {number} finalScore
+   * @returns {Array<object>} les paliers NOUVELLEMENT débloqués par ce run
+   */
+  function registerTrophyScore(finalScore) {
+    const p = _state.player;
+    p.trophy = p.trophy || { bestScore: 0, tiersReached: [] };
+    if (finalScore > (p.trophy.bestScore || 0)) p.trophy.bestScore = finalScore;
+
+    const tiers = _state.config.combat?.trophy?.rewardTiers || [];
+    const alreadyReached = new Set(p.trophy.tiersReached || []);
+    const newlyReached = tiers.filter(t => finalScore >= t.score && !alreadyReached.has(t.id));
+
+    newlyReached.forEach(t => {
+      alreadyReached.add(t.id);
+      _grantReward(t.reward);
+    });
+    p.trophy.tiersReached = [...alreadyReached];
+
+    _notify('trophyScoreRegistered', { finalScore, newlyReached });
+    _autoSave();
+    return newlyReached;
   }
 
   /**
@@ -1888,6 +1918,7 @@ const WBGameState = (() => {
     getTourneeProgress, getLeaderboardSnapshot,
     getStoryChapterProgress, completeStoryStage, isFeatureUnlocked,
     addDailyLoginCycle, updateDailyLoginCycle, removeDailyLoginCycle, getDailyLoginClaimable, claimDailyLoginReward,
+    registerTrophyScore,
     addDailyQuest, updateDailyQuest, removeDailyQuest, checkDailyQuests, trackQuestProgress, claimDailyQuest,
     checkWeeklyQuests, claimWeeklyQuest,
     updateBanners, updatePlayer,

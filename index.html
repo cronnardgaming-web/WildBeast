@@ -1074,6 +1074,14 @@
   .btn-primary:active{ transform:translateY(1px) scale(.99); }
   .btn-launch-combat{ width:100%; }
 
+  .trophy-hud{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--surface-2); border:1px solid var(--border);
+    border-radius:var(--radius); padding:8px 14px; margin-bottom:10px;
+    font-family:var(--font-display); font-size:.85rem; color:var(--text);
+  }
+  .trophy-hud-score strong{ color:var(--accent); font-size:1rem; }
+  .trophy-hud-rounds strong{ color:var(--accent2); }
   .battle-scene{ display:flex; flex-direction:column; gap:2px; margin-bottom:14px; position:relative; }
   .battle-side h3{
     font-size:.75rem; text-transform:uppercase; letter-spacing:.12em;

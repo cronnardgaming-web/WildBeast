@@ -843,7 +843,7 @@ const WBGameUI = (() => {
       { id:'story',        icon:'🌍', name:'Expédition',       desc:'Progressez monde par monde',                          featured:false, unlocked:WBGameState.isFeatureUnlocked?.('tournee')   ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 3' },
       { id:'byLine',       icon:'🐾', name:'Élevage',          desc:'Affrontez toute une lignée',                          featured:false, unlocked:WBGameState.isFeatureUnlocked?.('saga')      ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 4' },
       { id:'arena',        icon:'🏆', name:'Grand Gala',       desc:'Mode compétitif',                                     featured:false, unlocked:WBGameState.isFeatureUnlocked?.('grandgala') ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 5' },
-      { id:'record',       icon:'🏆', name:'Trophée',          desc:'Battez vos propres records',                          featured:false, unlocked:false, lockedDesc:'🔒 Bientôt disponible' },
+      { id:'trophy',       icon:'🏆', name:'Trophée',          desc:'Battez vos propres records',                          featured:false, unlocked:WBGameState.isFeatureUnlocked?.('trophy')    ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 6' },
       { id:'challenge',    icon:'🌀', name:'???',              desc:'Un nouveau défi vous attend...',                      featured:false, unlocked:false, lockedDesc:'🔒 Bientôt disponible' },
       // Événement — blingbling, pleine largeur
       { id:'event',        icon:'⭐', name:'Événement',        desc:'Des histoires exclusives aux créatures de l\'Event',   featured:false, unlocked:false, lockedDesc:'🔒 Bientôt disponible', eventFeatured:true },
@@ -2850,12 +2850,27 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     _renderBattle();
   }
 
+  /** Met à jour le score/tour affichés en direct pendant un run Trophée */
+  function _updateTrophyScoreHud() {
+    if (!_battle || _battle.mode !== 'trophy') return;
+    const scoreEl = document.getElementById('trophy-hud-score-value');
+    const roundEl = document.getElementById('trophy-hud-round-value');
+    if (scoreEl) scoreEl.textContent = (_battle.trophyScore || 0).toLocaleString('fr-FR');
+    if (roundEl) roundEl.textContent = _battle.turn;
+  }
+
   function _renderBattle() {
     const area = document.getElementById('battle-area');
     if (!area || !_battle) return;
 
     const b = _battle;
+    const trophyCfg = WBGameState.getConfig().combat.trophy || {};
     area.innerHTML = `
+      ${b.mode === 'trophy' ? `
+        <div class="trophy-hud" id="trophy-hud">
+          <span class="trophy-hud-score">🏆 Score : <strong id="trophy-hud-score-value">${(b.trophyScore || 0).toLocaleString('fr-FR')}</strong></span>
+          <span class="trophy-hud-rounds">Tour <strong id="trophy-hud-round-value">${b.turn}</strong> / ${trophyCfg.rounds || 15}</span>
+        </div>` : ''}
       <div class="battle-scene">
         <div class="battle-side battle-enemy">
           <h3>Ennemis</h3>
@@ -3058,6 +3073,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       // périmé par une action ultérieure.
       const attackerHpSnapshot = data.attacker.currentHp;
       const targetHpSnapshot   = data.target.currentHp;
+      if (_battle.mode === 'trophy') _updateTrophyScoreHud();
       // Passer l'animation par la queue pour qu'elle attende la précédente
       _queueCombatAnim(() => _playAttackAnimation(data.attacker, data.target, data.result, attackerHpSnapshot, targetHpSnapshot));
     }
@@ -3109,6 +3125,20 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       } else {
         _showBattleResult('defeat', data);
       }
+    }
+
+    if (event === 'trophyEnd') {
+      _resetCombatAnimQueue();
+      _showTrophyResult(data);
+    }
+
+    if (event === 'trophyEnemyReplaced') {
+      const card = document.getElementById(`fighter-${data.oldInstanceId}`);
+      if (card) {
+        const idx = _battle.enemyTeam.findIndex(e => e.instanceId === data.newCombatant.instanceId);
+        card.outerHTML = _renderFighter(data.newCombatant, idx);
+      }
+      _updateTrophyScoreHud();
     }
 
     if (event === 'error') {
@@ -3907,6 +3937,64 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     // Rafraîchir les icônes d'altérations (statuts actifs + buff ATK)
     const iconsEl = document.getElementById(`status-icons-${combatant.instanceId}`);
     if (iconsEl) iconsEl.innerHTML = _renderStatusIcons(combatant);
+  }
+
+  /** Écran de fin dédié au mode Trophée : score final, record battu, paliers débloqués */
+  function _showTrophyResult(data) {
+    WBAudioSystem.playResultSfx('victory');
+    document.getElementById('trophy-result-overlay')?.remove();
+
+    const finalScore   = data.rewards?.trophyScore || 0;
+    const newTiers     = data.rewards?.newlyReachedTiers || [];
+    const state        = WBGameState.get();
+    const bestScore     = state.player.trophy?.bestScore || 0;
+    const isNewBest     = finalScore >= bestScore && finalScore > 0;
+
+    const tiersHtml = newTiers.length ? `
+      <div class="bro-levelup-section">
+        <div class="bro-levelup-title">🎁 Palier${newTiers.length > 1 ? 's' : ''} débloqué${newTiers.length > 1 ? 's' : ''} !</div>
+        ${newTiers.map(t => `
+          <div class="bro-levelup-row">
+            <div class="bro-levelup-info">
+              <div class="bro-levelup-name">Score ${t.score.toLocaleString('fr-FR')}</div>
+              <div class="bro-stat-chips"><span class="bro-stat-chip">+${_formatRewardLabel(t.reward, state)}</span></div>
+            </div>
+          </div>`).join('')}
+      </div>` : '';
+
+    const shell = document.querySelector('.app-shell') || document.body;
+    const overlay = document.createElement('div');
+    overlay.id = 'trophy-result-overlay';
+    overlay.style.cssText = `
+      position:absolute; inset:0; z-index:8000;
+      background:#09040f;
+      display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+      overflow-y:auto; padding:32px 20px 40px;
+      opacity:0; transition:opacity 500ms ease;
+    `;
+    overlay.innerHTML = `
+      <div class="bro-victory-top">
+        <div class="bro-glow-ring"></div>
+        <div class="bro-title">🏆 SCORE FINAL</div>
+        <div class="bro-subtitle" style="font-size:1.6rem;font-weight:800;color:var(--accent);margin-top:8px">${finalScore.toLocaleString('fr-FR')}</div>
+        ${isNewBest ? `<div class="bro-subtitle" style="margin-top:4px">✨ Nouveau record personnel !</div>` : `<div class="bro-subtitle" style="margin-top:4px">Meilleur score : ${bestScore.toLocaleString('fr-FR')}</div>`}
+      </div>
+      ${tiersHtml}
+      <button class="btn-primary bro-back-btn" id="btn-trophy-back">Retour au lobby</button>
+    `;
+    shell.appendChild(overlay);
+    requestAnimationFrame(() => requestAnimationFrame(() => { overlay.style.opacity = '1'; }));
+
+    document.getElementById('btn-trophy-back')?.addEventListener('click', () => {
+      overlay.style.opacity = '0';
+      setTimeout(() => {
+        overlay.remove();
+        WBCombatEngine.reset();
+        _battle = null;
+        WBAudioSystem.playGlobal();
+        _showCombatSelect();
+      }, 500);
+    });
   }
 
   function _showBattleResult(result, data) {

@@ -4861,6 +4861,45 @@ const WBAdminPanel = (() => {
         </div>
       </div>
 
+      <div class="admin-section">
+        <div class="admin-section-title">🏆 Mode Trophée (score attack)</div>
+        <p style="font-size:.78rem;color:#888;margin:0 0 12px">
+          Vagues d'ennemis Niveau 1 à l'infini pendant un nombre de tours fixe. Les ennemis n'attaquent jamais — seul le score compte. Aucun XP/Or/Essence Sauvage gagné sur ce mode.
+        </p>
+        <div class="admin-field-row">
+          <div class="admin-field">
+            <label>Nombre de tours</label>
+            <input type="number" id="trophy-rounds" value="${(cCfg.trophy || {}).rounds ?? 15}" min="1" max="99">
+          </div>
+          <div class="admin-field">
+            <label>Bonus par ennemi vaincu</label>
+            <input type="number" id="trophy-killbonus" value="${(cCfg.trophy || {}).killBonus ?? 50}" min="0">
+          </div>
+          <div class="admin-field">
+            <label>Ennemis simultanés</label>
+            <input type="number" id="trophy-teamsize" value="${(cCfg.trophy || {}).enemyTeamSize ?? 3}" min="1" max="6">
+          </div>
+          <div class="admin-field">
+            <label>Coût énergie ⚡</label>
+            <input type="number" id="trophy-energycost" value="${(cfg.energy?.costs || {}).trophy ?? 15}" min="0">
+          </div>
+        </div>
+
+        <div class="admin-section-title" style="margin-top:16px;font-size:.85rem">🎁 Paliers de récompense</div>
+        <div id="trophy-tiers-rows">
+          ${((cCfg.trophy || {}).rewardTiers || []).map((t, i) => `
+            <div class="cycle-day-row trophy-tier-row" data-tier-idx="${i}" data-tier-id="${t.id}" style="margin-bottom:8px;padding:8px;background:#1a1630;border-radius:6px">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="min-width:50px;font-weight:700;font-size:.8rem">Score ≥</span>
+                <input type="number" class="trophy-tier-score" value="${t.score}" min="0" style="width:110px">
+                ${_buildRewardEditorHtml(`trophy-tier-${i}`, t.reward)}
+                <button class="admin-btn admin-btn-danger admin-btn-sm" onclick="WBAdminPanel._removeTrophyTierRow(${i})">🗑️</button>
+              </div>
+            </div>`).join('')}
+        </div>
+        <button class="admin-btn admin-btn-secondary admin-btn-sm" onclick="WBAdminPanel._addTrophyTierRow()">+ Palier</button>
+      </div>
+
       <div class="admin-actions">
         <button class="admin-btn admin-btn-success" onclick="WBAdminPanel._saveCombatConfig()">💾 Sauver tous les paramètres</button>
       </div>
@@ -6495,6 +6534,29 @@ const WBAdminPanel = (() => {
     el.textContent = examples.join(' | ');
   }
 
+  /** Ajoute un nouveau palier de récompense Trophée (score par défaut au-dessus du dernier palier existant) */
+  function _addTrophyTierRow() {
+    const state = WBGameState.get();
+    const tiers = [...((state.config.combat?.trophy || {}).rewardTiers || [])];
+    const lastScore = tiers.length ? tiers[tiers.length - 1].score : 0;
+    tiers.push({ id: `trophy_tier_${Date.now()}`, score: lastScore + 5000, reward: { type: 'gold', amount: 500 } });
+    WBGameState.updateConfig({
+      combat: { ...state.config.combat, trophy: { ...(state.config.combat.trophy || {}), rewardTiers: tiers } },
+    });
+    switchTab('combat');
+  }
+
+  /** Supprime un palier de récompense Trophée par son index affiché */
+  function _removeTrophyTierRow(idx) {
+    const state = WBGameState.get();
+    const tiers = [...((state.config.combat?.trophy || {}).rewardTiers || [])];
+    tiers.splice(idx, 1);
+    WBGameState.updateConfig({
+      combat: { ...state.config.combat, trophy: { ...(state.config.combat.trophy || {}), rewardTiers: tiers } },
+    });
+    switchTab('combat');
+  }
+
   function _saveCombatConfig() {
     const state  = WBGameState.get();
     const xpBase = parseInt(document.getElementById('level-xp-base')?.value || '100');
@@ -6547,6 +6609,23 @@ const WBAdminPanel = (() => {
           worldStatBoost:    parseInt(document.getElementById('story-world-boost')?.value || '10') / 100,
           rewardEliteGold:      parseInt(document.getElementById('story-reward-elite')?.value || '100'),
           rewardBossDiamonds:   parseInt(document.getElementById('story-reward-boss')?.value  || '100'),
+        },
+        trophy: {
+          rounds:        parseInt(document.getElementById('trophy-rounds')?.value || '15'),
+          killBonus:     parseInt(document.getElementById('trophy-killbonus')?.value || '50'),
+          enemyTeamSize: parseInt(document.getElementById('trophy-teamsize')?.value || '3'),
+          rewardTiers: Array.from(document.querySelectorAll('.trophy-tier-row')).map(row => ({
+            id:     row.dataset.tierId,
+            score:  parseInt(row.querySelector('.trophy-tier-score')?.value || '0'),
+            reward: _readRewardFromEditor(`trophy-tier-${row.dataset.tierIdx}`),
+          })).sort((a, b) => a.score - b.score),
+        },
+      },
+      energy: {
+        ...state.config.energy,
+        costs: {
+          ...(state.config.energy?.costs || {}),
+          trophy: parseInt(document.getElementById('trophy-energycost')?.value || '15'),
         },
       },
       level: {
@@ -6737,6 +6816,7 @@ const WBAdminPanel = (() => {
     _saveStoryMode, _addStoryChapter, _deleteStoryChapter,
     _saveResources, _addResources, _saveEnergyConfig, _fillEnergy, _resetStats,
     _saveCombatConfig, _saveAdaptiveScaling, _previewAdaptiveScaling, _saveEnemyRarityWeights, _resetEnemyRarityWeights, _updateEnemyWeightTotal, _saveEnemyXpBonus,
+    _addTrophyTierRow, _removeTrophyTierRow,
     _saveEventTemplate, _resetEventTemplate, _addEventTplQuest, _deleteEventTplQuest,
     _saveCurrentTag, _saveNextTag, _onTplDayTypeChange,
     _previewEvolvedFormWeight, _saveEvolvedFormWeightFactor,
