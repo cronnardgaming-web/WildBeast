@@ -823,7 +823,7 @@ const WBGameUI = (() => {
       // Ordre de déblocage
       { id:'fullRandom',   icon:'🎲', name:'Battue',           desc:'Équipe aléatoire, ennemies aléatoires',               featured:false, unlocked:WBGameState.isFeatureUnlocked?.('caprice')   ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 2' },
       { id:'story',        icon:'🌍', name:'Expédition',       desc:'Progressez monde par monde',                          featured:false, unlocked:WBGameState.isFeatureUnlocked?.('tournee')   ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 3' },
-      { id:'byLine',       icon:'🐾', name:'Élevage',          desc:'Affrontez toute une lignée',                          featured:false, unlocked:WBGameState.isFeatureUnlocked?.('saga')      ?? true, lockedDesc:'🔒 Disponible au Chapitre 3, Stage 5' },
+      { id:'byLine',       icon:'🐾', name:'Élevage',          desc:'Affrontez toute une lignée',                          featured:false, unlocked:WBGameState.isFeatureUnlocked?.('saga')      ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 4' },
       { id:'arena',        icon:'🏆', name:'Grand Gala',       desc:'Mode compétitif',                                     featured:false, unlocked:WBGameState.isFeatureUnlocked?.('grandgala') ?? true, lockedDesc:'🔒 Disponible à la fin du Chapitre 5' },
       { id:'record',       icon:'🏆', name:'Trophée',          desc:'Battez vos propres records',                          featured:false, unlocked:false, lockedDesc:'🔒 Bientôt disponible' },
       { id:'challenge',    icon:'🌀', name:'???',              desc:'Un nouveau défi vous attend...',                      featured:false, unlocked:false, lockedDesc:'🔒 Bientôt disponible' },
