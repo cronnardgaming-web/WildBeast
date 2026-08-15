@@ -117,26 +117,7 @@
      côtés. Ciblé sur "pointer:coarse" plutôt qu'une simple largeur, pour ne
      JAMAIS affecter la version PC — même une fenêtre de bureau réduite très
      étroite garde son cadre centré habituel. */
-  @media (pointer:coarse){
-    .app-shell{
-      max-width:100%;
-      width:100%;
-      margin:0;
-      border-left:none;
-      border-right:none;
-      height:100dvh; /* hauteur RÉELLEMENT visible sur mobile (exclut les barres du navigateur/du téléphone), 100vh les inclut parfois à tort */
-    }
-    /* Pendant un combat, l'en-tête libère sa place pour laisser le maximum
-       de hauteur disponible à la scène de combat (3 alliées + 3 ennemies). */
-    body.battle-active .app-header{ display:none; }
 
-    /* Combat : les 3 combattants d'un même camp restent TOUJOURS sur une
-       seule ligne (jamais de retour à la ligne), quelle que soit la largeur
-       exacte du téléphone — les cartes rétrécissent plutôt que de wrapper. */
-    .battle-fighters{ flex-wrap:nowrap; gap:5px; }
-    .fighter-card{ min-width:0; max-width:none; flex:1 1 0; padding:8px 3px 6px; gap:4px; }
-    .fighter-portrait{ width:50px; height:50px; font-size:1.05rem; }
-  }
 
   /* ── HEADER ── */
   .app-header{
@@ -3461,6 +3442,45 @@
     body{ overflow:auto; }
     .app-shell{ min-height:100vh; height:auto; border-left:1px solid var(--border-soft); border-right:1px solid var(--border-soft); }
     .main-content{ max-height:none; }
+  }
+
+  /* ============================================================
+     MOBILE (écrans tactiles UNIQUEMENT — jamais la version PC).
+     Placé en tout dernier dans la feuille de style pour être sûr de
+     l'emporter sur les règles de base qui le précèdent (même sélecteur,
+     même spécificité CSS → c'est l'ordre d'apparition qui décide).
+     ============================================================ */
+  @media (pointer:coarse){
+    .app-shell{
+      max-width:100%;
+      width:100%;
+      margin:0;
+      border-left:none;
+      border-right:none;
+      height:100dvh; /* hauteur RÉELLEMENT visible sur mobile (exclut les barres du navigateur/du téléphone), 100vh les inclut parfois à tort */
+    }
+    /* Pendant un combat, l'en-tête libère sa place pour laisser le maximum
+       de hauteur disponible à la scène de combat (3 alliées + 3 ennemies). */
+    body.battle-active .app-header{ display:none; }
+
+    /* Combat : les 3 combattants d'un même camp restent TOUJOURS sur une
+       seule ligne (jamais de retour à la ligne), quelle que soit la largeur
+       exacte du téléphone — les cartes rétrécissent plutôt que de wrapper. */
+    .battle-fighters{ flex-wrap:nowrap; gap:5px; }
+    .fighter-card{ min-width:0; max-width:none; flex:1 1 0; padding:8px 3px 6px; gap:4px; }
+    .fighter-portrait{ width:50px; height:50px; font-size:1.05rem; }
+
+    /* La barre de nav occupe maintenant vraiment toute la largeur du
+       téléphone (fini les bandes crème) : moins de place par bouton
+       qu'avant. On réduit leur taille et on autorise le texte à passer sur
+       2 lignes plutôt que de se chevaucher avec le bouton voisin. */
+    .app-nav-new{ padding-left:2px; padding-right:2px; gap:2px; }
+    .nav-new-btn{ padding:5px 2px; }
+    .nav-new-btn .nav-ico{ font-size:16px; }
+    .nav-new-btn .nav-lbl{ font-size:.5rem; letter-spacing:0; white-space:normal; text-align:center; line-height:1.05; }
+    .nav-combat-btn{ width:54px; height:54px; }
+    .nav-combat-btn .nav-ico{ font-size:18px; }
+    .nav-combat-btn .nav-lbl{ font-size:.48rem; }
   }
 </style>
 </head>
