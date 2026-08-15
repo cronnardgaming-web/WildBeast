@@ -919,7 +919,7 @@ const WBCombatEngine = (() => {
       }
       enemyTeam = [];
       for (let i = 0; i < nbEnemies; i++) {
-        const def = _pickWeightedRandomChar(allBase, cfg.enemyRarityWeights, 1);
+        const def = _pickWeightedRandomChar(allBase, cfg.combat.enemyRarityWeights, 1);
         const fakeInst = {
           instanceId: `story_enemy_${i}`,
           charId: def.id, level: lvl, awakening: 0, equipment: null,
