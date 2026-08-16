@@ -2758,7 +2758,7 @@
   .catalogue-portrait img{ width:100%; height:100%; object-fit:cover; object-position:center 20%; }
   .unknown-silhouette{ color:var(--text-faint); font-family:var(--font-display); font-size:1.4rem; }
   .catalogue-name{ font-size:.7rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .catalogue-rarity{ font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin-top:1px; }
+  .catalogue-rarity{ font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin-top:1px; filter:brightness(.6) saturate(1.3); }
   .catalogue-line-count{ font-size:.6rem; color:var(--text-dim); margin-top:3px; font-family:var(--font-mono); }
   .catalogue-entry{ cursor:pointer; transition:transform .15s ease, box-shadow .15s ease; }
   .catalogue-entry:hover{ transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,.4); }
@@ -2809,7 +2809,7 @@
     margin-top:10px; text-align:center; width:100%; padding:0 8px;
   }
   .catalogue-line-name{ font-size:1rem; font-weight:800; font-family:var(--font-display); }
-  .catalogue-line-rarity{ font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; margin:3px 0; }
+  .catalogue-line-rarity{ font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; margin:3px 0; filter:brightness(.6) saturate(1.3); }
   .catalogue-line-types{ display:flex; gap:4px; justify-content:center; flex-wrap:wrap; margin:4px 0; }
   .catalogue-line-desc{ font-size:.72rem; color:var(--text-dim); margin-top:6px; line-height:1.4; }
   .catalogue-line-evo-hint{ font-size:.7rem; color:var(--text-faint); margin-top:4px; }
@@ -3305,7 +3305,7 @@
   }
   .shop-card-portrait img{ width:100%; height:100%; object-fit:cover; object-position:center 20%; }
   .shop-card-name{ font-size:.78rem; font-weight:700; }
-  .shop-card-rarity{ font-size:.64rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; margin-top:-4px; }
+  .shop-card-rarity{ font-size:.64rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; margin-top:-4px; filter:brightness(.6) saturate(1.3); }
   .btn-shop-buy{
     margin-top:4px; width:100%;
     background:linear-gradient(135deg, var(--rose), var(--accent2-deep));
@@ -3314,7 +3314,7 @@
     transition:box-shadow .15s, transform .12s;
   }
   .btn-shop-buy:hover{ box-shadow:0 4px 14px -4px var(--rose-glow); transform:translateY(-1px); }
-  .btn-shop-buy:disabled{ opacity:.35; cursor:not-allowed; background:var(--surface-3); }
+  .btn-shop-buy:disabled{ opacity:1; cursor:not-allowed; background:var(--surface-3); color:var(--text-faint); }
 
   /* ============================================================
      QUÊTES QUOTIDIENNES & RÉCOMPENSE DE CONNEXION
@@ -3378,7 +3378,7 @@
     border:none; border-radius:999px; color:#fff;
     font-weight:800; font-size:.78rem; font-family:var(--font-mono); padding:8px 10px; cursor:pointer;
   }
-  .btn-quest-claim:disabled{ opacity:.4; cursor:not-allowed; background:var(--surface-3); }
+  .btn-quest-claim:disabled{ opacity:1; cursor:not-allowed; background:var(--surface-3); color:var(--text-faint); }
 
   /* Popup de réclamation de connexion quotidienne */
   .daily-login-popup{ max-width:380px; }

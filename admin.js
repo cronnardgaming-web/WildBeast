@@ -2264,7 +2264,7 @@ const WBAdminPanel = (() => {
             ${SHOP_KIND_LABELS[l.kind] || l.kind} — ${resolveRefName(l)}
             ${l.enabled === false ? '<span class="badge" style="background:#555;color:#ccc;">Désactivé</span>' : ''}
           </div>
-          <div class="admin-list-item-sub">Prix : ${l.price} ${l.currency === 'crystals' ? '💧' : '💵'} | ID article : ${l.id}</div>
+          <div class="admin-list-item-sub">Prix : ${l.price} ${l.currency === 'crystals' ? '💧' : '💵'} | ID article : ${l.id} | ${l.permanent === false ? 'Boutique temporaire' : '♾️ Boutique permanente'}</div>
         </div>
         <div class="admin-list-item-actions">
           <button class="admin-btn admin-btn-primary admin-btn-sm" onclick="WBAdminPanel._editShopListing('${l.id}')">✏️</button>
@@ -2304,6 +2304,13 @@ const WBAdminPanel = (() => {
           <div class="admin-field">
             <label>Disponible</label>
             <select id="shop-enabled">
+              <option value="1">Oui</option>
+              <option value="0">Non</option>
+            </select>
+          </div>
+          <div class="admin-field">
+            <label>Boutique permanente</label>
+            <select id="shop-permanent">
               <option value="1">Oui</option>
               <option value="0">Non</option>
             </select>
@@ -2405,6 +2412,7 @@ const WBAdminPanel = (() => {
       price: Math.max(0, parseInt(document.getElementById('shop-price')?.value || '0')),
       currency: document.getElementById('shop-currency')?.value === 'crystals' ? 'crystals' : 'gold',
       enabled: document.getElementById('shop-enabled')?.value === '1',
+      permanent: document.getElementById('shop-permanent')?.value !== '0',
     };
 
     const state = WBGameState.get();
@@ -2429,6 +2437,7 @@ const WBAdminPanel = (() => {
     _setVal('shop-price', l.price);
     _setVal('shop-currency', l.currency);
     _setVal('shop-enabled', l.enabled === false ? '0' : '1');
+    _setVal('shop-permanent', l.permanent === false ? '0' : '1');
     document.getElementById('admin-content')?.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -2454,6 +2463,7 @@ const WBAdminPanel = (() => {
     _setVal('shop-price', '100');
     _setVal('shop-currency', 'gold');
     _setVal('shop-enabled', '1');
+    _setVal('shop-permanent', '1');
   }
 
   // ─── ONGLET QUOTIDIEN (connexion + quêtes) ──────────────────────────────────────

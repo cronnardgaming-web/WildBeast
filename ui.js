@@ -843,7 +843,7 @@ const WBGameUI = (() => {
     const state = WBGameState.get();
     const ev    = WBGameState.getActiveEvent();
     const costs = state.config?.energy?.costs || {};
-    const costKeyByModeId = { story:'story', byLine:'line', fullRandom:'fullRandom', arena:'arena', trophy:'trophy' };
+    const costKeyByModeId = { storyMode:'storyMode', story:'story', byLine:'line', fullRandom:'fullRandom', arena:'arena', trophy:'trophy' };
 
     const modes = [
       // Histoire — featured, toujours disponible

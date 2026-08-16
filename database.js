@@ -122,7 +122,8 @@ const WBGameDatabase = (() => {
       combatCost: 10,           // conservé pour compatibilité (= coût du combat aléatoire)
       costs: {
         random:     10,
-        story:      10,   // Mode Odyssée (histoire)
+        story:      10,   // Mode Odyssée (Expédition)
+        storyMode:  5,    // Mode Histoire (narratif, par chapitre)
         line:       20,
         fullRandom: 10,
         arena:      15,
