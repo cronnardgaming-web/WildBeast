@@ -4711,7 +4711,7 @@ const WBAdminPanel = (() => {
       <div class="admin-section">
         <div class="admin-section-title">🌍 Mode Expédition</div>
         <p style="font-size:.78rem;color:#888;margin-bottom:10px">
-          Paramètres de la progression par monde. Les élites et boss reçoivent un boost de stats multiplicatif.
+          Paramètres de la progression par monde. Les Béta et Alpha reçoivent un boost de stats multiplicatif.
         </p>
         <div class="admin-grid">
           <div class="admin-field">
@@ -4719,19 +4719,19 @@ const WBAdminPanel = (() => {
             <input type="number" id="story-sublevels" value="${cCfg.story?.subLevelsPerWorld ?? 25}" min="1" max="100" />
           </div>
           <div class="admin-field">
-            <label>Sous-niveau Boss</label>
+            <label>Sous-niveau Alpha</label>
             <input type="number" id="story-boss" value="${cCfg.story?.bossSubLevel ?? 25}" min="1" max="100" />
           </div>
           <div class="admin-field">
-            <label>Élite — Sous-niveaux (ex: 10,20)</label>
+            <label>Béta — Sous-niveaux (ex: 10,20)</label>
             <input type="text"   id="story-elites" value="${(cCfg.story?.eliteSubLevels ?? [10,20]).join(',')}" placeholder="10,20" />
           </div>
           <div class="admin-field">
-            <label>Élite — Boost stats (%)</label>
+            <label>Béta — Boost stats (%)</label>
             <input type="number" id="story-elite-boost" value="${Math.round((cCfg.story?.eliteStatBoost ?? 0.10) * 100)}" min="0" max="200" />
           </div>
           <div class="admin-field">
-            <label>Boss — Boost stats (%)</label>
+            <label>Alpha — Boost stats (%)</label>
             <input type="number" id="story-boss-boost" value="${Math.round((cCfg.story?.bossStatBoost ?? 0.25) * 100)}" min="0" max="500" />
           </div>
           <div class="admin-field">
@@ -4739,11 +4739,11 @@ const WBAdminPanel = (() => {
             <input type="number" id="story-world-boost" value="${Math.round((cCfg.story?.worldStatBoost ?? 0.10) * 100)}" min="0" max="200" />
           </div>
           <div class="admin-field">
-            <label>Bonus or — victoire Élite 💵</label>
+            <label>Bonus or — victoire Béta 💵</label>
             <input type="number" id="story-reward-elite" value="${cCfg.story?.rewardEliteGold ?? 100}" min="0" step="10" />
           </div>
           <div class="admin-field">
-            <label>Bonus Essence Sauvage — victoire Boss 💧</label>
+            <label>Bonus Essence Sauvage — victoire Alpha 💧</label>
             <input type="number" id="story-reward-boss" value="${cCfg.story?.rewardBossDiamonds ?? 100}" min="0" step="10" />
           </div>
         </div>
@@ -6629,7 +6629,7 @@ const WBAdminPanel = (() => {
     const xpBase = parseInt(document.getElementById('level-xp-base')?.value || '100');
     const xpExpo = parseFloat(document.getElementById('level-xp-expo')?.value || '1.8');
 
-    // Sous-niveaux élites (champ texte "10,20")
+    // Sous-niveaux Béta (champ texte "10,20")
     const eliteRaw = document.getElementById('story-elites')?.value || '10,20';
     const eliteSubLevels = eliteRaw.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
 

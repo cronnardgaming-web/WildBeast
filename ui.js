@@ -842,7 +842,8 @@ const WBGameUI = (() => {
 
     const state = WBGameState.get();
     const ev    = WBGameState.getActiveEvent();
-    const cfg   = state.config?.combat?.costs || {};
+    const costs = state.config?.energy?.costs || {};
+    const costKeyByModeId = { story:'story', byLine:'line', fullRandom:'fullRandom', arena:'arena', trophy:'trophy' };
 
     const modes = [
       // Histoire — featured, toujours disponible
@@ -874,6 +875,7 @@ const WBGameUI = (() => {
         <div class="cs-card-icon">${m.icon}${!m.unlocked ? ' 🔒' : ''}</div>
         <div class="cs-card-name">${m.name}</div>
         <div class="cs-card-desc">${m.unlocked ? m.desc : m.lockedDesc}</div>
+        ${m.unlocked && costKeyByModeId[m.id] != null ? `<div class="energy-cost-badge">⚡${costs[costKeyByModeId[m.id]] ?? 10}</div>` : ''}
       </div>`;
     }).join('');
 
@@ -882,7 +884,13 @@ const WBGameUI = (() => {
         const mode = card.dataset.mode;
         el.classList.remove('active');
         if (mode === 'storyMode') { showScreen('story-chapters'); return; }
-        if (mode === 'story' || mode === 'byLine') { showScreen('combat'); return; }
+        if (mode === 'story' || mode === 'byLine' || mode === 'arena') {
+          _combatMode = mode === 'byLine' ? 'line' : mode;
+          _selectedLine = null;
+          _selectedArenaType = null;
+          showScreen('combat');
+          return;
+        }
         showScreen('combat');
         setTimeout(() => _launchCombat({ mode: mode === 'fullRandom' ? 'fullRandom' : mode }), 100);
       });
@@ -2388,45 +2396,16 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     const el = document.getElementById('screen-combat');
     if (!el) return;
     const team  = WBGameState.getTeam();
-    const costs = WBGameState.getConfig().energy.costs || {};
     const ev    = WBGameState.getActiveEvent();
 
-    // Onglets de base
-    let tabsHtml = `
-      <button class="combat-mode-btn ${_combatMode === 'story' ? 'active' : ''}" data-mode="story">
-        🌍 Expédition <span class="energy-cost-badge">⚡${costs.story ?? 10}</span>
-      </button>
-      <button class="combat-mode-btn ${_combatMode === 'line' ? 'active' : ''}" data-mode="line">
-        🐾 Élevage <span class="energy-cost-badge">⚡${costs.line ?? 20}</span>
-      </button>
-      <button class="combat-mode-btn ${_combatMode === 'fullRandom' ? 'active' : ''}" data-mode="fullRandom">
-        🎲 Battue <span class="energy-cost-badge">⚡${costs.fullRandom ?? 10}</span>
-      </button>
-      <button class="combat-mode-btn ${_combatMode === 'arena' ? 'active' : ''}" data-mode="arena">
-        🗺️ Territoire <span class="energy-cost-badge">⚡${costs.arena ?? 15}</span>
-      </button>`;
-
-    // Onglets event — mis en avant si un event est actif
-    if (ev) {
-      const tag = WBGameState.get().tags?.find(t => t.id === ev.tagId);
-      const tagLabel = tag ? `${tag.icon || '✨'} ${tag.name}` : '✨ Event';
-      const capCost  = ev.combatConfig?.capriceDeEtoile?.energyCost ?? 10;
-      const tagCost  = ev.combatConfig?.combatTag?.energyCost ?? 15;
-      tabsHtml += `
-        <button class="combat-mode-btn combat-mode-event ${_combatMode === 'capriceEtoile' ? 'active' : ''}" data-mode="capriceEtoile">
-          🌟 Battue Sauvage <span class="energy-cost-badge">⚡${capCost}</span>
-        </button>
-        <button class="combat-mode-btn combat-mode-event ${_combatMode === 'fullEvent' ? 'active' : ''}" data-mode="fullEvent">
-          ${tagLabel} <span class="energy-cost-badge">⚡${tagCost}</span>
-        </button>`;
-    } else if (_combatMode === 'capriceEtoile' || _combatMode === 'fullEvent') {
-      _combatMode = 'story'; // reset si l'event est terminé
+    // Repli si l'event vient de se terminer pendant qu'un mode event était sélectionné
+    if (!ev && (_combatMode === 'capriceEtoile' || _combatMode === 'fullEvent')) {
+      _combatMode = 'story';
     }
 
     el.innerHTML = `
       <div class="screen-header"><h2>⚔ Combat</h2>${_helpBtn('combat')}</div>
       ${ev ? `<div class="event-combat-banner">✨ Event en cours — ${WBGameState.get().tags?.find(t=>t.id===ev.tagId)?.name || ev.tagId}</div>` : ''}
-      <div class="combat-mode-tabs">${tabsHtml}</div>
       <div class="combat-lobby">
         <div id="combat-mode-content-top"></div>
         <div class="team-preview">
@@ -2452,16 +2431,6 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       </div>
       <div id="battle-area" style="display:none"></div>
     `;
-
-    el.querySelectorAll('.combat-mode-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (_combatMode === btn.dataset.mode) return;
-        _combatMode = btn.dataset.mode;
-        _selectedLine = null;
-        _selectedArenaType = null;
-        renderCombatLobby();
-      });
-    });
 
     _renderCombatModeContent();
   }
@@ -2621,8 +2590,8 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
    */
   /**
    * ── MODE ODYSSÉE ──
-   * Affiche la progression par Sanctuaire/Épreuve. Chaque épreuve est soit normale,
-   * soit élite (x10 et x20 de chaque sanctuaire, en violet), soit boss (x25, en rouge).
+   * Affiche la progression par Profondeur/Épreuve. Chaque épreuve est soit normale,
+   * soit béta (x10 et x20 de chaque profondeur, en violet), soit alpha (x25, en rouge).
    * Une épreuve ne peut être rejouée une fois accomplie (en cas de défaite, la même
    * équipe ennemie est conservée pour les réessais).
    */
@@ -2655,11 +2624,11 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         const sub = nextSub;
         const isElite = eliteSubs.includes(sub);
         const isBoss  = sub === bossSub;
-        const typeLabel = isBoss ? '💀 Boss' : isElite ? '⚔ Élite' : '▶';
+        const typeLabel = isBoss ? '💀 Alpha' : isElite ? '⚔ Béta' : '▶';
         top.innerHTML = `
           <button class="btn-primary btn-launch-combat story-launch-btn ${isBoss ? 'story-boss-btn' : isElite ? 'story-elite-btn' : ''}"
                   id="btn-launch" style="width:100%;margin-bottom:8px">
-            ${typeLabel} Lancer Sanctuaire ${world} — Rendez-vous ${sub}
+            ${typeLabel} Lancer Profondeur -${world} — Cavité ${sub}
           </button>
         `;
         document.getElementById('btn-launch')?.addEventListener('click', () =>
@@ -2667,7 +2636,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         );
       } else {
         top.innerHTML = worldComplete
-          ? `<p class="combat-mode-note">🎉 Sanctuaire ${world} accompli ! Le prochain s'ouvre devant toi…</p>`
+          ? `<p class="combat-mode-note">🎉 Profondeur -${world} accomplie ! La prochaine s'ouvre devant toi…</p>`
           : '';
       }
     }
@@ -2675,7 +2644,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     const rewardElite = storyCfg.rewardEliteGold    ?? 100;
     const rewardBoss  = storyCfg.rewardBossDiamonds ?? 100;
 
-    // Grille des 25 épreuves du sanctuaire courant
+    // Grille des 25 épreuves de la profondeur courante
     const cells = Array.from({ length: perWorld }, (_, i) => {
       const sub = i + 1;
       const done   = sub <= completedSub;
@@ -2698,7 +2667,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
           : '';
 
       return `
-        <div class="${cls}" title="Sanctuaire ${world} — Rendez-vous ${sub}${isElite ? ` (+${rewardElite} 💵)` : ''}${isBoss ? ` (+${rewardBoss} 💧)` : ''}">
+        <div class="${cls}" title="Profondeur -${world} — Cavité ${sub}${isElite ? ` (+${rewardElite} 💵)` : ''}${isBoss ? ` (+${rewardBoss} 💧)` : ''}">
           <div class="story-sub-number">${world}-${sub}</div>
           ${label ? `<div class="story-sub-badge">${label}</div>` : ''}
           ${rewardBadge}
@@ -2709,12 +2678,12 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
 
     content.innerHTML = `
       <div class="story-header">
-        <div class="story-world-title">🌸 Sanctuaire ${world}</div>
+        <div class="story-world-title">🌸 Profondeur -${world}</div>
         ${worldBoost > 0 ? `<div class="story-world-bonus">+${Math.round(worldBoost * 100)}% stats ennemies</div>` : ''}
         <div class="story-progress-bar-wrap">
           <div class="story-progress-bar" style="width:${Math.min(100, (completedSub / perWorld) * 100)}%"></div>
         </div>
-        <div class="story-progress-label">${completedSub} / ${perWorld} Rendez-vous</div>
+        <div class="story-progress-label">${completedSub} / ${perWorld} Cavités</div>
       </div>
       <div class="story-sub-grid">${cells}</div>
     `;
@@ -4086,7 +4055,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         </div>
         ${battle?.mode === 'story' && battle.storyWorld != null ? `
           <div class="bro-story-label">
-            ✨ Sanctuaire ${battle.storyWorld} — Rendez-vous ${battle.storySubLevel} accompli !
+            ✨ Profondeur -${battle.storyWorld} — Cavité ${battle.storySubLevel} accomplie !
           </div>` : ''}
         ${data.rewards ? `
           <div class="bro-rewards">
@@ -4096,9 +4065,9 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
             ${data.rewards.energyPotionsDropped > 0 ? `<span>+${data.rewards.energyPotionsDropped} 🧪</span>` : ''}
           </div>
           ${data.rewards.eliteBonusGold > 0 ? `
-            <div class="bro-bonus-badge bro-bonus-elite">⚔️ Bonus Élite +${data.rewards.eliteBonusGold} 💵</div>` : ''}
+            <div class="bro-bonus-badge bro-bonus-elite">⚔️ Bonus Béta +${data.rewards.eliteBonusGold} 💵</div>` : ''}
           ${data.rewards.bossBonusDiamonds > 0 ? `
-            <div class="bro-bonus-badge bro-bonus-boss">👑 Bonus Boss +${data.rewards.bossBonusDiamonds} 💧</div>` : ''}
+            <div class="bro-bonus-badge bro-bonus-boss">👑 Bonus Alpha +${data.rewards.bossBonusDiamonds} 💧</div>` : ''}
         ` : ''}
         ${levelUpHtml}
         ${captureHtml}
@@ -4113,7 +4082,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         </div>
         ${battle?.mode === 'story' && battle.storyWorld != null ? `
           <div class="bro-story-label" style="color:#f87171">
-            💢 Sanctuaire ${battle.storyWorld} — Rendez-vous ${battle.storySubLevel} — Réessaie !
+            💢 Profondeur -${battle.storyWorld} — Cavité ${battle.storySubLevel} — Réessaie !
           </div>` : ''}
         <button class="btn-primary bro-back-btn" id="btn-back-lobby">Retour au lobby</button>
       `;
