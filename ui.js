@@ -1913,7 +1913,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
                   }).join('')}
                 </div>
               </div>
-              ${def.evolvesTo ? `<div class="detail-evo">Évolue au niveau <strong>${def.evolutionCondition?.value || '?'}</strong></div>` : ''}
+              ${def.evolvesTo ? `<div class="detail-evo">${_formatEvoConditionText(def)}</div>` : ''}
               <div class="detail-char-history">
                 <div class="detail-history-row">
                   <span>📅 Obtenue le</span>
@@ -3779,6 +3779,17 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   }
 
   /** Affiche un texte flottant temporaire au-dessus d'une carte de combattant */
+  /** Formate la condition d'évolution d'une créature pour affichage au joueur */
+  function _formatEvoConditionText(def) {
+    const cond = def.evolutionCondition;
+    if (!cond) return 'Évolution';
+    if (cond.type === 'item') {
+      const item = WBGameState.get().items.find(i => i.id === cond.itemId);
+      return item ? `Évolue avec ${item.icon || '🎒'} ${item.name}` : 'Évolue avec un objet spécial';
+    }
+    return `Évolue au niveau <strong>${cond.value ?? '?'}</strong>`;
+  }
+
   function _spawnFloatText(card, text, cls, stack = 0, big = false) {
     const el = document.createElement('div');
     el.className = `float-text ${cls}`;
@@ -6202,7 +6213,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
                     ${entry && t2 ? `<span class="type-badge" style="background:${t2.color}">${t2.icon} ${t2.name}</span>` : ''}
                   </div>
                   ${entry && char.evolvesTo
-                    ? `<div class="catalogue-line-evo-hint">Évolue au niveau <strong>${char.evolutionCondition?.value || '?'}</strong></div>`
+                    ? `<div class="catalogue-line-evo-hint">${_formatEvoConditionText(char)}</div>`
                     : ''}
                 </div>
               </div>`;

@@ -813,6 +813,12 @@ const WBGameDatabase = (() => {
       amountLabel: 'Énergie regagnée',
       requiresTarget: false,  // s'applique directement au joueur
     },
+    evolve_item: {
+      label: 'Pierre d\'Évolution',
+      description: 'Fait évoluer instantanément la créature choisie, à condition que sa fiche exige précisément CET objet comme condition d\'évolution (réglé dans Personnages → Condition d\'évolution → Objet).',
+      amountLabel: null,      // pas de quantité, l'évolution est un tout-ou-rien
+      requiresTarget: true,   // nécessite de choisir une créature
+    },
   };
 
   const DEFAULT_ITEMS = [
@@ -831,6 +837,14 @@ const WBGameDatabase = (() => {
       description: 'Redonne immédiatement 50 points d\'énergie.',
       stackable: true,
       effect: { type: 'energy_regen', amount: 50 },
+    },
+    {
+      id: 'item_evolution_stone_temp',
+      name: 'Pierre d\'Évolution (Temporaire)',
+      icon: '🪨',
+      description: 'Objet provisoire — sert uniquement à tester la condition d\'évolution par objet en attendant les vrais objets définitifs. Non disponible en boutique, à ajouter manuellement dans l\'inventaire d\'un joueur depuis l\'admin pour tester.',
+      stackable: true,
+      effect: { type: 'evolve_item' },
     },
   ];
 

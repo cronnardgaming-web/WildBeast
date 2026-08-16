@@ -778,6 +778,23 @@ const WBGameState = (() => {
       return { success: true, energyGained: effect.amount };
     }
 
+    if (effect.type === 'evolve_item') {
+      if (!targetInstanceId) return { success: false, reason: 'target_required' };
+      const inst = _state.player.collection.find(c => c.instanceId === targetInstanceId);
+      if (!inst) return { success: false, reason: 'target_not_found' };
+
+      const charDef = getCharDef(inst.charId);
+      const cond = charDef?.evolutionCondition;
+      if (!charDef?.evolvesTo || cond?.type !== 'item' || cond.itemId !== itemId) {
+        return { success: false, reason: 'wrong_evolution_condition' };
+      }
+
+      const evolved = _evolveCharacter(inst, charDef);
+      _consumeItem(itemId);
+      _notify('levelUp', { instanceId: targetInstanceId, levelUps: [], evolved });
+      return { success: true, evolved };
+    }
+
     return { success: false, reason: 'unsupported_effect' };
   }
 

@@ -758,14 +758,21 @@ const WBAdminPanel = (() => {
             </div>
             <div class="admin-field">
               <label>Condition (type)</label>
-              <select id="char-evo-cond-type">
+              <select id="char-evo-cond-type" onchange="WBAdminPanel._toggleEvoCondField()">
                 <option value="level">Niveau</option>
                 <option value="item">Objet</option>
               </select>
             </div>
-            <div class="admin-field">
+            <div class="admin-field" id="char-evo-cond-value-wrap">
               <label>Condition (valeur)</label>
               <input type="number" id="char-evo-cond-value" placeholder="15" min="1" />
+            </div>
+            <div class="admin-field" id="char-evo-cond-item-wrap" style="display:none">
+              <label>Condition (objet requis)</label>
+              <select id="char-evo-cond-item">
+                <option value="">— Choisir un objet —</option>
+                ${WBGameState.get().items.map(it => `<option value="${it.id}">${it.icon || '🎒'} ${it.name}</option>`).join('')}
+              </select>
             </div>
           </div>
         </div>
@@ -898,7 +905,7 @@ const WBAdminPanel = (() => {
           <div class="admin-list-item-sub">
             <span style="color:#443">ID:</span> ${c.id}
             ${c.evolutionLine ? ` · <span style="color:#443">Lignée:</span> ${c.evolutionLine} <span style="color:#443">Stade</span> ${c.evolutionStage ?? 0}` : ''}
-            ${c.evolvesTo ? ` · <span style="color:#443">→</span> ${c.evolvesTo} <span style="color:#443">niv.</span>${c.evolutionCondition?.value || '?'}` : ''}
+            ${c.evolvesTo ? ` · <span style="color:#443">→</span> ${c.evolvesTo} <span style="color:#443">(</span>${_formatEvoCondition(c)}<span style="color:#443">)</span>` : ''}
           </div>
           <div class="stat-pills">
             <span class="stat-pill">♥ ${c.baseStats.hp}</span>
@@ -931,6 +938,26 @@ const WBAdminPanel = (() => {
   }
 
   /** Enregistre ou crée un personnage */
+  /** Formate la condition d'évolution d'un personnage pour affichage (admin) */
+  function _formatEvoCondition(c) {
+    const cond = c.evolutionCondition;
+    if (!cond) return '?';
+    if (cond.type === 'item') {
+      const item = WBGameState.get().items.find(i => i.id === cond.itemId);
+      return item ? `${item.icon || '🎒'} ${item.name}` : '🎒 objet inconnu';
+    }
+    return `niv.${cond.value ?? '?'}`;
+  }
+
+  /** Affiche le champ adapté (nombre pour Niveau, sélecteur pour Objet) selon le type de condition d'évolution choisi */
+  function _toggleEvoCondField() {
+    const type = document.getElementById('char-evo-cond-type')?.value;
+    const valueWrap = document.getElementById('char-evo-cond-value-wrap');
+    const itemWrap  = document.getElementById('char-evo-cond-item-wrap');
+    if (valueWrap) valueWrap.style.display = type === 'item' ? 'none' : '';
+    if (itemWrap)  itemWrap.style.display  = type === 'item' ? '' : 'none';
+  }
+
   function _saveCharacter() {
     const id       = document.getElementById('char-id')?.value.trim() || `char_${Date.now()}`;
     const name     = document.getElementById('char-name')?.value.trim();
@@ -941,8 +968,9 @@ const WBAdminPanel = (() => {
     const evoLine  = document.getElementById('char-evo-line')?.value.trim() || `line_${id}`;
     const evoStage = parseInt(document.getElementById('char-evo-stage')?.value || '0');
     const evolvesTo = document.getElementById('char-evolves-to')?.value.trim() || null;
-    const condType  = document.getElementById('char-evo-cond-type')?.value;
-    const condVal   = parseInt(document.getElementById('char-evo-cond-value')?.value || '0');
+    const condType   = document.getElementById('char-evo-cond-type')?.value;
+    const condVal    = parseInt(document.getElementById('char-evo-cond-value')?.value || '0');
+    const condItemId = document.getElementById('char-evo-cond-item')?.value || null;
 
     if (!name) { _notify('❌ Le nom est obligatoire.', 'error'); return; }
     if (!type1) { _notify('❌ Le type principal est obligatoire.', 'error'); return; }
@@ -962,7 +990,10 @@ const WBAdminPanel = (() => {
         def: Math.min(9999,  parseInt(document.getElementById('char-def')?.value || '40')),
         spd: Math.min(9999,  parseInt(document.getElementById('char-spd')?.value || '50')),
       },
-      evolutionCondition: condVal > 0 ? { type: condType, value: condVal } : null,
+      evolutionCondition:
+        condType === 'item'
+          ? (condItemId ? { type: 'item', itemId: condItemId } : null)
+          : (condVal > 0 ? { type: 'level', value: condVal } : null),
       evolvesTo: evolvesTo || null,
       portraitCrop: _cropEditor.getPortraitCrop(),
       detailCrop:   _cropEditor.getDetailCrop(),
@@ -1003,7 +1034,9 @@ const WBAdminPanel = (() => {
     _setVal('char-evo-stage', c.evolutionStage ?? 0);
     _setVal('char-evolves-to', c.evolvesTo || '');
     _setVal('char-evo-cond-type', c.evolutionCondition?.type || 'level');
-    _setVal('char-evo-cond-value', c.evolutionCondition?.value || '');
+    _setVal('char-evo-cond-value', c.evolutionCondition?.type === 'item' ? '' : (c.evolutionCondition?.value || ''));
+    _setVal('char-evo-cond-item', c.evolutionCondition?.type === 'item' ? (c.evolutionCondition?.itemId || '') : '');
+    _toggleEvoCondField();
     _setVal('char-hp', c.baseStats.hp);
     _setVal('char-atk', c.baseStats.atk);
     _setVal('char-def', c.baseStats.def);
@@ -1045,7 +1078,9 @@ const WBAdminPanel = (() => {
   /** Vide le formulaire personnage */
   function _clearCharForm() {
     ['char-id','char-name','char-portrait','char-evo-line',
-     'char-evolves-to','char-evo-cond-value'].forEach(id => _setVal(id, ''));
+     'char-evolves-to','char-evo-cond-value','char-evo-cond-item'].forEach(id => _setVal(id, ''));
+    _setVal('char-evo-cond-type', 'level');
+    _toggleEvoCondField();
     _setVal('char-rarity', 'common');
     _setVal('char-type1', '');
     _setVal('char-type2', '');
@@ -3670,7 +3705,7 @@ const WBAdminPanel = (() => {
              ondragend="WBAdminPanel._dragEnd(event)">
           ${c.portrait ? `<img src="${c.portrait}" style="width:50px;height:62px;object-fit:cover;border-radius:4px;" />` : `<div style="width:50px;height:62px;background:#333;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#888;font-size:.7rem;">?</div>`}
           <div style="font-size:.75rem; color:#e8d5b7; margin-top:4px;">${c.name}</div>
-          <div style="font-size:.68rem; color:#888;">Niv. ${c.evolutionCondition?.value || '—'}</div>
+          <div style="font-size:.68rem; color:#888;">${_formatEvoCondition(c)}</div>
         </div>
         ${i < members.length - 1 ? '<span style="font-size:1.2rem; color:#e94560; vertical-align:middle;">→</span>' : ''}
       `).join('');
@@ -3696,7 +3731,7 @@ const WBAdminPanel = (() => {
             ${members.map(c => `
               <div style="font-size:.72rem; color:#888;">
                 <strong style="color:#e8d5b7">${c.name}</strong> (${c.id}) Stage ${c.evolutionStage || 0}
-                ${c.evolvesTo ? `→ ${c.evolvesTo} @ lv.${c.evolutionCondition?.value || '?'}` : '<span style="color:#4ade80">✓ Forme finale</span>'}
+                ${c.evolvesTo ? `→ ${c.evolvesTo} @ ${_formatEvoCondition(c)}` : '<span style="color:#4ade80">✓ Forme finale</span>'}
                 <button class="admin-btn admin-btn-primary admin-btn-sm" style="margin-left:8px;" onclick="WBAdminPanel._editCharacter('${c.id}'); WBAdminPanel.switchTab('characters');">✏️ Éditer</button>
                 <button class="admin-btn admin-btn-secondary admin-btn-sm" onclick="WBAdminPanel._upgradeCharacter('${c.id}')">⬆️ Upgrade</button>
               </div>
@@ -6879,7 +6914,7 @@ const WBAdminPanel = (() => {
     // Méthodes appelées depuis le HTML (onclick)
     _previewPortrait,
     _openCropEditor, _cropZoom, _cropReset, _cropConfirm,
-    _saveCharacter, _editCharacter, _deleteCharacter, _clearCharForm, _upgradeCharacter,
+    _saveCharacter, _editCharacter, _deleteCharacter, _clearCharForm, _upgradeCharacter, _toggleEvoCondField,
     _saveType, _editType, _deleteType, _clearTypeForm,
     _saveTagCategory, _editTagCategory, _deleteTagCategory, _clearTagCategoryForm,
     _saveTag, _editTag, _deleteTag, _clearTagForm, _addTagToLine, _addTagToLineFromCategory, _removeTagFromLine,
