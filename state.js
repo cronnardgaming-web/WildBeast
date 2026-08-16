@@ -449,14 +449,16 @@ const WBGameState = (() => {
     inst.charId = nextDef.id;
     _registerInCatalogue(nextDef);
 
-    // Tracking quête event : si le perso (forme de base) a le tag de l'event
-    const ev = getActiveEvent();
-    if (ev && (charDef.tags?.includes(ev.tagId) || nextDef.tags?.includes(ev.tagId))) {
+    // Comptabilise TOUJOURS l'évolution, event actif ou non
     _state.player.stats = {
       ..._state.player.stats,
       totalEvolutions: (_state.player.stats.totalEvolutions || 0) + 1,
     };
-    trackEventQuestProgress('event_evolve');
+
+    // Tracking quête event : si le perso (forme de base) a le tag de l'event
+    const ev = getActiveEvent();
+    if (ev && (charDef.tags?.includes(ev.tagId) || nextDef.tags?.includes(ev.tagId))) {
+      trackEventQuestProgress('event_evolve');
     }
 
     _notify('evolved', { instanceId: inst.instanceId, newCharId: nextDef.id });

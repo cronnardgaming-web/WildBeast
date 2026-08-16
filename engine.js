@@ -1625,10 +1625,6 @@ const WBCombatEngine = (() => {
     if (success) {
       capturable.captured = true;
       const addResult = WBGameState.addCharacterToCollection(capturable.charId, 'combat');
-      const player = WBGameState.getPlayer();
-      WBGameState.updatePlayer({
-        stats: { ...player.stats, totalCaptures: player.stats.totalCaptures + 1 },
-      });
       WBGameState.updatePlayer({
         stats: {
           ...WBGameState.getPlayer().stats,
