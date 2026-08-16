@@ -40,6 +40,7 @@ const WBAdminPanel = (() => {
     { id: 'daily',      label: '📅 Quotidien',   group: 'Mécanique'  },
     { id: 'attacks',    label: '💥 Passifs',      group: 'Mécanique'  },
     { id: 'combat',     label: '⚔️ Combat',       group: 'Mécanique'  },
+    { id: 'trophy',     label: '🎯 Traque',       group: 'Mécanique'  },
     // ── Système ──────────────────────────────────────────────────────────────
     { id: 'player',     label: '🎮 Joueur',      group: 'Système'    },
     { id: 'resources',  label: '💧 Ressources',  group: 'Système'    },
@@ -670,6 +671,7 @@ const WBAdminPanel = (() => {
           case 'player':     content.innerHTML = _renderPlayerTab();     break;
           case 'resources':  content.innerHTML = _renderResourcesTab();  break;
           case 'combat':     content.innerHTML = _renderCombatTab();     break;
+          case 'trophy':     content.innerHTML = _renderTrophyTab();     break;
           case 'items':      content.innerHTML = _renderItemsTab();      break;
           case 'shop':       content.innerHTML = _renderShopTab();       break;
           case 'daily':      content.innerHTML = _renderDailyTab();      _rebuildCycleDayRows();      break;
@@ -4840,11 +4842,11 @@ const WBAdminPanel = (() => {
               pulls: state.player.stats?.totalPulls || 0,
               evolutions: state.player.stats?.totalEvolutions || 0,
               awakenings: state.player.stats?.totalAwakenings || 0,
-              goldEarned: state.player.stats?.totalGoldEarned || 0,
               scoreTotal: WBGameState.getPlayerAuraScoreTotal?.() || 0,
               scoreTeam:  WBGameState.getPlayerAuraScoreTeam?.()  || 0,
               tourneeProgress: WBGameState.getTourneeProgress?.() || 0,
               galleryEntries:  Object.keys(state.player.catalogue || {}).length,
+              trophyBestScore: state.player.trophy?.bestScore || 0,
             }[key] || 0;
             const pts = Math.floor(statVal / rule.every);
             return `<div class="admin-field">
@@ -4859,45 +4861,6 @@ const WBAdminPanel = (() => {
             </div>`;
           }).join('')}
         </div>
-      </div>
-
-      <div class="admin-section">
-        <div class="admin-section-title">🎯 Mode Traque (score attack)</div>
-        <p style="font-size:.78rem;color:#888;margin:0 0 12px">
-          Vagues d'ennemis Niveau 1 à l'infini pendant un nombre de tours fixe. Les ennemis n'attaquent jamais — seul le score compte. Aucun XP/Or/Essence Sauvage gagné sur ce mode.
-        </p>
-        <div class="admin-field-row">
-          <div class="admin-field">
-            <label>Nombre de tours</label>
-            <input type="number" id="trophy-rounds" value="${(cCfg.trophy || {}).rounds ?? 15}" min="1" max="99">
-          </div>
-          <div class="admin-field">
-            <label>Bonus par ennemi vaincu</label>
-            <input type="number" id="trophy-killbonus" value="${(cCfg.trophy || {}).killBonus ?? 50}" min="0">
-          </div>
-          <div class="admin-field">
-            <label>Ennemis simultanés</label>
-            <input type="number" id="trophy-teamsize" value="${(cCfg.trophy || {}).enemyTeamSize ?? 3}" min="1" max="6">
-          </div>
-          <div class="admin-field">
-            <label>Coût énergie ⚡</label>
-            <input type="number" id="trophy-energycost" value="${(cfg.energy?.costs || {}).trophy ?? 15}" min="0">
-          </div>
-        </div>
-
-        <div class="admin-section-title" style="margin-top:16px;font-size:.85rem">🎁 Paliers de récompense</div>
-        <div id="trophy-tiers-rows">
-          ${((cCfg.trophy || {}).rewardTiers || []).map((t, i) => `
-            <div class="cycle-day-row trophy-tier-row" data-tier-idx="${i}" data-tier-id="${t.id}" style="margin-bottom:8px;padding:8px;background:#1a1630;border-radius:6px">
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <span style="min-width:50px;font-weight:700;font-size:.8rem">Score ≥</span>
-                <input type="number" class="trophy-tier-score" value="${t.score}" min="0" style="width:110px">
-                ${_buildRewardEditorHtml(`trophy-tier-${i}`, t.reward)}
-                <button class="admin-btn admin-btn-danger admin-btn-sm" onclick="WBAdminPanel._removeTrophyTierRow(${i})">🗑️</button>
-              </div>
-            </div>`).join('')}
-        </div>
-        <button class="admin-btn admin-btn-secondary admin-btn-sm" onclick="WBAdminPanel._addTrophyTierRow()">+ Palier</button>
       </div>
 
       <div class="admin-actions">
@@ -6221,7 +6184,8 @@ const WBAdminPanel = (() => {
         <table style="width:100%;font-size:.8rem;border-collapse:collapse;">
           <thead>
             <tr style="text-align:left;border-bottom:1px solid #333;">
-              <th style="padding:6px 8px;">Joueur</th>
+              <th style="padding:6px 8px;">Compte (email)</th>
+              <th style="padding:6px 8px;">Pseudo en jeu</th>
               <th style="padding:6px 8px;text-align:center;">Niveau</th>
               <th style="padding:6px 8px;text-align:center;">💧</th>
               <th style="padding:6px 8px;text-align:center;">💵</th>
@@ -6245,13 +6209,19 @@ const WBAdminPanel = (() => {
               return `
                 <tr style="border-bottom:1px solid #2a2a3a;">
                   <td style="padding:6px 8px;">${p.display_name || s.user_id}</td>
+                  <td style="padding:6px 8px;">${pd.name || '—'}</td>
                   <td style="padding:6px 8px;text-align:center;">${level}</td>
-                  <td style="padding:6px 8px;text-align:center;">${crystals.toLocaleString('fr-FR')}</td>
-                  <td style="padding:6px 8px;text-align:center;">${gold.toLocaleString('fr-FR')}</td>
+                  <td style="padding:6px 8px;text-align:center;">
+                    <input type="number" min="0" value="${crystals}" style="width:70px" id="qedit-crystals-${s.user_id}">
+                  </td>
+                  <td style="padding:6px 8px;text-align:center;">
+                    <input type="number" min="0" value="${gold}" style="width:70px" id="qedit-gold-${s.user_id}">
+                  </td>
                   <td style="padding:6px 8px;text-align:center;">${collCount}</td>
                   <td style="padding:6px 8px;text-align:center;font-size:.72rem;color:#888;">${updated}</td>
                   <td style="padding:6px 8px;text-align:center;font-size:.72rem;color:#888;">${backupTxt}</td>
                   <td style="padding:6px 8px;white-space:nowrap;">
+                    <button class="admin-btn admin-btn-success admin-btn-sm" onclick="WBAdminPanel._quickSavePlayerCurrency('${s.user_id}')">💾</button>
                     <button class="admin-btn admin-btn-primary admin-btn-sm" onclick="WBAdminPanel._openPlayerEditor('${s.user_id}')">✏️ Éditer</button>
                     ${backupAt ? `<button class="admin-btn admin-btn-danger admin-btn-sm" onclick="WBAdminPanel._confirmRestoreBackup('${s.user_id}')">⏪ Restaurer</button>` : ''}
                   </td>
@@ -6274,6 +6244,24 @@ const WBAdminPanel = (() => {
   let _impersonation = null; // { targetUserId, targetDisplayName, adminOwnPlayerSnapshot }
 
   /** Bascule l'admin en mode édition sur les données d'un autre joueur */
+  /** Modifie directement l'Essence Sauvage/Or d'un joueur depuis le tableau, sans passer par le mode édition complet */
+  async function _quickSavePlayerCurrency(userId) {
+    const entry = _playerAccountsCache?.[userId];
+    if (!entry) { _notify('❌ Données introuvables — recharge l\'onglet.', 'error'); return; }
+
+    const crystals = parseInt(document.getElementById(`qedit-crystals-${userId}`)?.value || '0');
+    const gold     = parseInt(document.getElementById(`qedit-gold-${userId}`)?.value || '0');
+    const updatedData = { ...entry.data, currency: { ...(entry.data.currency || {}), crystals, gold } };
+
+    try {
+      await WBBackend.savePlayerData(userId, updatedData);
+      entry.data = updatedData; // garder le cache local à jour
+      _notify(`✅ Essence Sauvage/Or mis à jour pour ${_playerAccountsProfileName(userId)}.`);
+    } catch (e) {
+      _notify(`❌ Échec de la sauvegarde : ${e.message}`, 'error');
+    }
+  }
+
   function _openPlayerEditor(userId) {
     const entry = _playerAccountsCache?.[userId];
     if (!entry) { _notify('❌ Données introuvables — recharge l\'onglet.', 'error'); return; }
@@ -6535,6 +6523,85 @@ const WBAdminPanel = (() => {
   }
 
   /** Ajoute un nouveau palier de récompense Trophée (score par défaut au-dessus du dernier palier existant) */
+  /** Onglet dédié au mode Traque (score attack), à côté de l'onglet Combat */
+  function _renderTrophyTab() {
+    const state = WBGameState.get();
+    const cfg   = state.config;
+    const tCfg  = cfg.combat?.trophy || {};
+    return `
+      <div class="admin-section">
+        <div class="admin-section-title">🎯 Mode Traque (score attack)</div>
+        <p style="font-size:.78rem;color:#888;margin:0 0 12px">
+          Vagues d'ennemis Niveau 1 à l'infini pendant un nombre de tours fixe. Les ennemis n'attaquent jamais — seul le score compte. Aucun XP/Or/Essence Sauvage gagné sur ce mode.
+        </p>
+        <div class="admin-field-row">
+          <div class="admin-field">
+            <label>Nombre de tours</label>
+            <input type="number" id="trophy-rounds" value="${tCfg.rounds ?? 15}" min="1" max="99">
+          </div>
+          <div class="admin-field">
+            <label>Bonus par ennemi vaincu</label>
+            <input type="number" id="trophy-killbonus" value="${tCfg.killBonus ?? 50}" min="0">
+          </div>
+          <div class="admin-field">
+            <label>Ennemis simultanés</label>
+            <input type="number" id="trophy-teamsize" value="${tCfg.enemyTeamSize ?? 3}" min="1" max="6">
+          </div>
+          <div class="admin-field">
+            <label>Coût énergie ⚡</label>
+            <input type="number" id="trophy-energycost" value="${(cfg.energy?.costs || {}).trophy ?? 15}" min="0">
+          </div>
+        </div>
+
+        <div class="admin-section-title" style="margin-top:16px;font-size:.85rem">🎁 Paliers de récompense</div>
+        <div id="trophy-tiers-rows">
+          ${(tCfg.rewardTiers || []).map((t, i) => `
+            <div class="cycle-day-row trophy-tier-row" data-tier-idx="${i}" data-tier-id="${t.id}" style="margin-bottom:8px;padding:8px;background:#1a1630;border-radius:6px">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="min-width:50px;font-weight:700;font-size:.8rem">Score ≥</span>
+                <input type="number" class="trophy-tier-score" value="${t.score}" min="0" style="width:110px">
+                ${_buildRewardEditorHtml(`trophy-tier-${i}`, t.reward)}
+                <button class="admin-btn admin-btn-danger admin-btn-sm" onclick="WBAdminPanel._removeTrophyTierRow(${i})">🗑️</button>
+              </div>
+            </div>`).join('')}
+        </div>
+        <button class="admin-btn admin-btn-secondary admin-btn-sm" onclick="WBAdminPanel._addTrophyTierRow()">+ Palier</button>
+      </div>
+
+      <div class="admin-actions">
+        <button class="admin-btn admin-btn-success" onclick="WBAdminPanel._saveTrophyConfig()">💾 Sauver la config Traque</button>
+      </div>
+    `;
+  }
+
+  /** Sauvegarde dédiée à l'onglet Traque (indépendante de _saveCombatConfig) */
+  function _saveTrophyConfig() {
+    const state = WBGameState.get();
+    WBGameState.updateConfig({
+      combat: {
+        ...state.config.combat,
+        trophy: {
+          rounds:        parseInt(document.getElementById('trophy-rounds')?.value || '15'),
+          killBonus:     parseInt(document.getElementById('trophy-killbonus')?.value || '50'),
+          enemyTeamSize: parseInt(document.getElementById('trophy-teamsize')?.value || '3'),
+          rewardTiers: Array.from(document.querySelectorAll('.trophy-tier-row')).map(row => ({
+            id:     row.dataset.tierId,
+            score:  parseInt(row.querySelector('.trophy-tier-score')?.value || '0'),
+            reward: _readRewardFromEditor(`trophy-tier-${row.dataset.tierIdx}`),
+          })).sort((a, b) => a.score - b.score),
+        },
+      },
+      energy: {
+        ...state.config.energy,
+        costs: {
+          ...(state.config.energy?.costs || {}),
+          trophy: parseInt(document.getElementById('trophy-energycost')?.value || '15'),
+        },
+      },
+    });
+    _notify('✅ Config Traque sauvegardée.');
+  }
+
   function _addTrophyTierRow() {
     const state = WBGameState.get();
     const tiers = [...((state.config.combat?.trophy || {}).rewardTiers || [])];
@@ -6543,7 +6610,7 @@ const WBAdminPanel = (() => {
     WBGameState.updateConfig({
       combat: { ...state.config.combat, trophy: { ...(state.config.combat.trophy || {}), rewardTiers: tiers } },
     });
-    switchTab('combat');
+    switchTab('trophy');
   }
 
   /** Supprime un palier de récompense Trophée par son index affiché */
@@ -6554,7 +6621,7 @@ const WBAdminPanel = (() => {
     WBGameState.updateConfig({
       combat: { ...state.config.combat, trophy: { ...(state.config.combat.trophy || {}), rewardTiers: tiers } },
     });
-    switchTab('combat');
+    switchTab('trophy');
   }
 
   function _saveCombatConfig() {
@@ -6610,22 +6677,14 @@ const WBAdminPanel = (() => {
           rewardEliteGold:      parseInt(document.getElementById('story-reward-elite')?.value || '100'),
           rewardBossDiamonds:   parseInt(document.getElementById('story-reward-boss')?.value  || '100'),
         },
-        trophy: {
-          rounds:        parseInt(document.getElementById('trophy-rounds')?.value || '15'),
-          killBonus:     parseInt(document.getElementById('trophy-killbonus')?.value || '50'),
-          enemyTeamSize: parseInt(document.getElementById('trophy-teamsize')?.value || '3'),
-          rewardTiers: Array.from(document.querySelectorAll('.trophy-tier-row')).map(row => ({
-            id:     row.dataset.tierId,
-            score:  parseInt(row.querySelector('.trophy-tier-score')?.value || '0'),
-            reward: _readRewardFromEditor(`trophy-tier-${row.dataset.tierIdx}`),
-          })).sort((a, b) => a.score - b.score),
-        },
+        // Config Traque : déplacée dans son propre onglet (cf. _saveTrophyConfig),
+        // on la préserve telle quelle ici pour ne pas l'écraser silencieusement.
+        trophy: state.config.combat?.trophy,
       },
       energy: {
         ...state.config.energy,
         costs: {
           ...(state.config.energy?.costs || {}),
-          trophy: parseInt(document.getElementById('trophy-energycost')?.value || '15'),
         },
       },
       level: {
@@ -6641,7 +6700,7 @@ const WBAdminPanel = (() => {
       },
     };
     // Bonus joueur
-    const bonusKeys = ['battles','victories','kills','captures','pulls','evolutions','awakenings','goldEarned','scoreTotal','scoreTeam','tourneeProgress','galleryEntries'];
+    const bonusKeys = ['battles','victories','kills','captures','pulls','evolutions','awakenings','scoreTotal','scoreTeam','tourneeProgress','galleryEntries','trophyBestScore'];
     const defaultBonus = WBGameDatabase.DEFAULT_CONFIG.playerBonus;
     const playerBonus = {};
     bonusKeys.forEach(k => {
@@ -6816,6 +6875,7 @@ const WBAdminPanel = (() => {
     _saveStoryMode, _addStoryChapter, _deleteStoryChapter,
     _saveResources, _addResources, _saveEnergyConfig, _fillEnergy, _resetStats,
     _saveCombatConfig, _saveAdaptiveScaling, _previewAdaptiveScaling, _saveEnemyRarityWeights, _resetEnemyRarityWeights, _updateEnemyWeightTotal, _saveEnemyXpBonus,
+    _renderTrophyTab, _saveTrophyConfig,
     _addTrophyTierRow, _removeTrophyTierRow,
     _saveEventTemplate, _resetEventTemplate, _addEventTplQuest, _deleteEventTplQuest,
     _saveCurrentTag, _saveNextTag, _onTplDayTypeChange,
@@ -6823,7 +6883,7 @@ const WBAdminPanel = (() => {
     _uploadAudioFile, _removeAudioFile, _saveAudioEnabled,
     _previewBackground, _saveBackground, _removeBackground,
     _runCloudImport,
-    _openPlayerEditor, _savePlayerImpersonation, _cancelPlayerImpersonation, _confirmRestoreBackup,
+    _openPlayerEditor, _savePlayerImpersonation, _cancelPlayerImpersonation, _confirmRestoreBackup, _quickSavePlayerCurrency,
     _dragStart, _dragOver, _dragLeave, _dragEnd, _dragDropChar, _dragDropEquip, _dragDropEvoStage, _dragDropType,
     _sortCharList, _filterCharList, _sortEquipList,
   };

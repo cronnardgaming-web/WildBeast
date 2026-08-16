@@ -405,6 +405,14 @@ const WBGameUI = (() => {
         document.body.classList.add('battle-active');
         lobby.style.display      = 'none';
         battleArea.style.display = 'block';
+        // Pendant le tutoriel aussi : masquer les raccourcis de mode et le menu du bas
+        const tutoTabsEl = document.querySelector('.combat-mode-tabs');
+        if (tutoTabsEl) tutoTabsEl.style.display = 'none';
+        const tutoEventBannerEl = document.querySelector('.event-combat-banner');
+        if (tutoEventBannerEl) tutoEventBannerEl.style.display = 'none';
+        const tutoNavEl = document.getElementById('main-nav');
+        if (tutoNavEl) tutoNavEl.style.display = 'none';
+        document.getElementById('plus-menu')?.classList.remove('open');
         WBAudioSystem.playCombat?.();
         _renderBattle();
         const preTxt = s.preCombatText || 'Voici votre premier combat !';
@@ -1297,23 +1305,21 @@ const WBGameUI = (() => {
     const statCards = [
       // Carte bonus en pleine largeur en tête
       { label: '✨ Bonus stats (toutes)', value: `+${bonusInfo.bonus}`, highlight: true, full: true },
+      // Score / progression (le plus parlant en un coup d'œil)
+      { label: '⭐ Attrait total',       value: (WBGameState.getPlayerAuraScoreTotal?.()||0).toLocaleString('fr-FR'), highlight: true, progress: _progressBarHtml('scoreTotal') },
+      { label: '👑 Attrait d\'équipe',  value: (WBGameState.getPlayerAuraScoreTeam?.()||0).toLocaleString('fr-FR'),  highlight: true, progress: _progressBarHtml('scoreTeam') },
+      { label: '🌍 Expédition',         value: `Monde ${tourneeWorld} — ${tourneeSubLevel}/${tourneePerWorld}`, highlight: true, progress: _progressBarHtml('tourneeProgress') },
+      { label: '🎯 Meilleur score Traque', value: (player.trophy?.bestScore||0).toLocaleString('fr-FR'), highlight: true, progress: _progressBarHtml('trophyBestScore') },
+      // Performance en combat
       { label: '⚔️ Combats',           value: (stats.totalBattles||0).toLocaleString('fr-FR'),    highlight: false, progress: _progressBarHtml('battles') },
       { label: '🏆 Victoires',          value: (stats.totalVictories||0).toLocaleString('fr-FR'),  highlight: true,  progress: _progressBarHtml('victories') },
-      { label: '💀 Défaites',           value: (stats.totalDefeats||0).toLocaleString('fr-FR'),    highlight: false },
-      { label: '📈 Taux de victoire',   value: `${winRate}%`,                                       highlight: winRate>=60 },
-      { label: '⚡ Série actuelle',     value: (stats.currentWinStreak||0).toLocaleString('fr-FR'), highlight: false },
-      { label: '🔥 Meilleure série',    value: (stats.longestWinStreak||0).toLocaleString('fr-FR'), highlight: true  },
       { label: '💥 Ennemis vaincus',   value: (stats.totalKills||0).toLocaleString('fr-FR'),       highlight: false, progress: _progressBarHtml('kills') },
+      // Collection
       { label: '🐾 Apprivoisements',    value: (stats.totalCaptures||0).toLocaleString('fr-FR'),    highlight: false, progress: _progressBarHtml('captures') },
       { label: '💧 Invocations',        value: (stats.totalPulls||0).toLocaleString('fr-FR'),       highlight: false, progress: _progressBarHtml('pulls') },
       { label: '✨ Évolutions',         value: (stats.totalEvolutions||0).toLocaleString('fr-FR'), highlight: false, progress: _progressBarHtml('evolutions') },
       { label: '⭐ Éveils',             value: (stats.totalAwakenings||0).toLocaleString('fr-FR'), highlight: false, progress: _progressBarHtml('awakenings') },
       { label: '📚 Encyclopédie',        value: `${galleryEntries} / ${catalogueTotal}`,             highlight: galleryEntries===catalogueTotal, progress: _progressBarHtml('galleryEntries') },
-      { label: '💵 $ gagnés',           value: (stats.totalGoldEarned||0).toLocaleString('fr-FR'), highlight: false, progress: _progressBarHtml('goldEarned') },
-      { label: '💧 Essence Sauvage gagnée', value: (stats.totalCrystalsEarned||0).toLocaleString('fr-FR'), highlight: false },
-      { label: '⭐ Attrait total',       value: (WBGameState.getPlayerAuraScoreTotal?.()||0).toLocaleString('fr-FR'), highlight: true, progress: _progressBarHtml('scoreTotal') },
-      { label: '👑 Attrait d\'équipe',  value: (WBGameState.getPlayerAuraScoreTeam?.()||0).toLocaleString('fr-FR'),  highlight: true, progress: _progressBarHtml('scoreTeam') },
-      { label: '🌍 Expédition',         value: `Monde ${tourneeWorld} — ${tourneeSubLevel}/${tourneePerWorld}`, highlight: true, progress: _progressBarHtml('tourneeProgress') },
     ];
     const statsEl = document.getElementById('pm-stats-grid');
     if (statsEl) statsEl.innerHTML = statCards.map(s => `
@@ -2424,7 +2430,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       <div class="combat-lobby">
         <div id="combat-mode-content-top"></div>
         <div class="team-preview">
-          <h3>Votre casting</h3>
+          <h3>Votre équipe</h3>
           ${_combatMode === 'fullRandom' ? `<p class="combat-mode-note">🎲 Une équipe sera tirée au sort dans votre collection pour cette Battue. Votre équipe actuelle sera restaurée juste après.</p>` : ''}
           ${_combatMode === 'capriceEtoile' ? `<p class="combat-mode-note">🌟 Battue Sauvage : équipe aléatoire contre des adversaires ${WBGameState.get().tags?.find(t=>t.id===ev?.tagId)?.name || 'Event'} uniquement.</p>` : ''}
           ${_combatMode === 'fullEvent' ? `<p class="combat-mode-note">✨ Combat ${WBGameState.get().tags?.find(t=>t.id===ev?.tagId)?.name || 'Event'} : alliées ET adversaires sont du tag ${WBGameState.get().tags?.find(t=>t.id===ev?.tagId)?.name || 'Event'} uniquement.</p>` : ''}
@@ -2878,7 +2884,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         </div>
         <div class="battle-vs">⚔</div>
         <div class="battle-side battle-player">
-          <h3>Votre casting</h3>
+          <h3>Votre équipe</h3>
           <div class="battle-fighters" id="player-fighters">
             ${b.playerTeam.map((p, i) => _renderFighter(p, i)).join('')}
           </div>
@@ -4103,7 +4109,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         <div class="bro-defeat-top">
           <div class="bro-defeat-icon">💀</div>
           <div class="bro-defeat-title">Défaite...</div>
-          <div class="bro-defeat-sub">Elles étaient trop fortes cette fois</div>
+          <div class="bro-defeat-sub">Ils étaient trop forts cette fois</div>
         </div>
         ${battle?.mode === 'story' && battle.storyWorld != null ? `
           <div class="bro-story-label" style="color:#f87171">
@@ -4214,14 +4220,14 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         btn.disabled = true;
         if (res?.success) {
           btn.style.background = '#4ade80';
-          btn.textContent = '✓ Séduite !';
+          btn.textContent = '✓ Apprivoisé !';
           const awakeningMax = _checkAwakeningMaxAndGrantPill(res.addResult);
           _updateHUD();
           _playCaptureReveal(revealEl, btn.dataset.charId, res.addResult, awakeningMax);
         } else {
           btn.style.background = '#f87171';
           btn.textContent = '✗ Raté';
-          if (logEl) logEl.innerHTML += `<div class="log-line">Elle s'échappe...</div>`;
+          if (logEl) logEl.innerHTML += `<div class="log-line">L'animal s'échappe...</div>`;
         }
       });
     });

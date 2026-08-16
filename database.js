@@ -245,7 +245,6 @@ const WBGameDatabase = (() => {
       pulls:      { every: 200,   label: 'Invocations'        },
       evolutions: { every: 50,    label: 'Évolutions'         },
       awakenings: { every: 100,   label: 'Éveils'             },
-      goldEarned: { every: 10000, label: 'Dollars gagnés en combat' },
       // ── Score Attrait (calculés en direct, pas des compteurs cumulés) ──────────
       // Seuils à ajuster librement depuis l'admin selon l'échelle réelle des
       // scores obtenus en jeu.
@@ -253,6 +252,7 @@ const WBGameDatabase = (() => {
       scoreTeam:  { every: 10000, label: "Attrait d'équipe (3 meilleurs scores)" },
       tourneeProgress: { every: 25,  label: 'Sous-niveaux Tournée complétés' },
       galleryEntries:  { every: 10,  label: 'Entrées débloquées (Encyclopédie)' },
+      trophyBestScore: { every: 5000, label: 'Meilleur score à la Traque' },
     },
   };
 
@@ -884,9 +884,9 @@ const WBGameDatabase = (() => {
   // Pool de quêtes hebdomadaires — objectifs ×5 vs quotidiennes, récompenses proportionnellement plus généreuses.
   // 5 quêtes sont tirées aléatoirement chaque lundi à minuit (heure locale).
   const DEFAULT_WEEKLY_QUESTS = [
-    { id: "wq_capture_5",       type: "capture_character",     target: 5,  name: "Séduire 5 actrices",       reward: { type: "crystals", amount: 100 } },
-    { id: "wq_capture_10",      type: "capture_character",     target: 10, name: "Séduire 10 actrices",      reward: { type: "crystals", amount: 200 } },
-    { id: "wq_capture_15",      type: "capture_character",     target: 15, name: "Séduire 15 actrices",      reward: { type: "crystals", amount: 350 } },
+    { id: "wq_capture_5",       type: "capture_character",     target: 5,  name: "Apprivoiser 5 créatures",       reward: { type: "crystals", amount: 100 } },
+    { id: "wq_capture_10",      type: "capture_character",     target: 10, name: "Apprivoiser 10 créatures",      reward: { type: "crystals", amount: 200 } },
+    { id: "wq_capture_15",      type: "capture_character",     target: 15, name: "Apprivoiser 15 créatures",      reward: { type: "crystals", amount: 350 } },
     { id: "wq_defeat_25",       type: "defeat_enemies",        target: 25, name: "Remporter 25 duels",       reward: { type: "gold",     amount: 800 } },
     { id: "wq_defeat_50",       type: "defeat_enemies",        target: 50, name: "Remporter 50 duels",       reward: { type: "gold",     amount: 1500 } },
     { id: "wq_summon_eq_5",     type: "summon_equipment",      target: 5,  name: "Découvrir 5 équipements",      reward: { type: "gold",     amount: 300 } },
@@ -903,9 +903,9 @@ const WBGameDatabase = (() => {
   ];
   // librement depuis l'administration (type, quantité, objet/équipement/créature).
   const DEFAULT_DAILY_QUESTS = [
-    { id: "quest_capture_1", type: "capture_character", target: 1, name: "Séduire 1 actrice", enabled: true, reward: { type: "crystals", amount: 15 } },
-    { id: "quest_capture_2", type: "capture_character", target: 2, name: "Séduire 2 actrices", enabled: true, reward: { type: "crystals", amount: 35 } },
-    { id: "quest_capture_3", type: "capture_character", target: 3, name: "Séduire 3 actrices", enabled: true, reward: { type: "crystals", amount: 70 } },
+    { id: "quest_capture_1", type: "capture_character", target: 1, name: "Apprivoiser 1 créature", enabled: true, reward: { type: "crystals", amount: 15 } },
+    { id: "quest_capture_2", type: "capture_character", target: 2, name: "Apprivoiser 2 créatures", enabled: true, reward: { type: "crystals", amount: 35 } },
+    { id: "quest_capture_3", type: "capture_character", target: 3, name: "Apprivoiser 3 créatures", enabled: true, reward: { type: "crystals", amount: 70 } },
     { id: "quest_defeat_5", type: "defeat_enemies", target: 5, name: "Remporter 5 duels", enabled: true, reward: { type: "gold", amount: 150 } },
     { id: "quest_defeat_10", type: "defeat_enemies", target: 10, name: "Remporter 10 duels", enabled: true, reward: { type: "gold", amount: 300 } },
     { id: "quest_summon_eq_1", type: "summon_equipment", target: 1, name: "Découvrir 1 équipement", enabled: true, reward: { type: "gold", amount: 50 } },

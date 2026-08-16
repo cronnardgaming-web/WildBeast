@@ -154,7 +154,7 @@ const WBCombatEngine = (() => {
     if (!attacker.statusEffects || attacker.statusEffects.length === 0) return;
     if (!_rollChance(garderobe.params.chance)) return;
     attacker.statusEffects = [];
-    _battle.log.push(`👗 ${attacker.name} utilise Garde Robe sur elle-même et retire toutes ses altérations !`);
+    _battle.log.push(`👗 ${attacker.name} utilise Garde Robe sur soi-même et retire toutes ses altérations !`);
     _emit('passiveTriggered', {
       combatantId: attacker.instanceId, isEnemy: attacker.isEnemy,
       passiveId: garderobe.id, passiveName: garderobe.name,
@@ -228,7 +228,7 @@ const WBCombatEngine = (() => {
         ? allies[Math.floor(Math.random() * allies.length)]
         : actor;
       chosen.tempAtkBuffPercent = (chosen.tempAtkBuffPercent || 0) + ardente.params.percent;
-      const target = chosen.instanceId === actor.instanceId ? 'elle-même' : chosen.name;
+      const target = chosen.instanceId === actor.instanceId ? 'soi-même' : chosen.name;
       _battle.log.push(`🔥 ${actor.name} utilise Ardente sur ${target} : Charisme +${ardente.params.percent}% pour la prochaine attaque !`);
       _emit('passiveTriggered', {
         combatantId: actor.instanceId, isEnemy: actor.isEnemy,

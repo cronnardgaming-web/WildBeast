@@ -1125,9 +1125,9 @@ const WBGameState = (() => {
       pulls:      stats.totalPulls       || 0,
       evolutions: stats.totalEvolutions  || 0,
       awakenings: stats.totalAwakenings  || 0,
-      goldEarned: stats.totalGoldEarned  || 0,
       tourneeProgress: getTourneeProgress(),
       galleryEntries:  Object.keys(_state.player.catalogue || {}).length,
+      trophyBestScore: _state.player.trophy?.bestScore || 0,
     };
     // Score Aura : ce ne sont PAS des compteurs stockés mais des valeurs
     // recalculées en direct à partir de toute la collection (cf. plus bas).
