@@ -303,10 +303,12 @@ const WBCombatEngine = (() => {
     const poison = (enemy.statusEffects || []).find(s => s.type === 'poison');
     if (!poison) return;
     const dmg = Math.max(1, Math.round(enemy.maxHp * (poison.damagePercentMaxHp / 100)));
+    const hpBefore = enemy.currentHp;
     enemy.currentHp = Math.max(0, enemy.currentHp - dmg);
     _addTrophyScore(dmg);
     poison.turnsLeft--;
     _battle.log.push(`☠️ ${enemy.name} subit ${dmg} dégâts de poison.`);
+    _emit('statusTriggered', { combatantId: enemy.instanceId, isEnemy: enemy.isEnemy, statusType: 'poison', amount: dmg, hpBefore, hpAfter: enemy.currentHp });
     if (enemy.currentHp <= 0) {
       enemy.alive = false;
       enemy.currentHp = 0;
@@ -1459,12 +1461,12 @@ const WBCombatEngine = (() => {
       WBGameState.setTeam(_battle.restoreTeam);
     }
 
-    // ── Mode Trophée : fin dédiée, aucun XP/Or/Essence Sauvage — uniquement le
-    // score et les paliers de récompense personnels franchis pour la première fois.
+    // ── Mode Trophée : fin dédiée, aucun XP/Or/Essence Sauvage — le joueur
+    // devra réclamer manuellement ses récompenses de palier sur l'écran dédié.
     if (_battle.mode === 'trophy') {
       const finalScore = _battle.trophyScore || 0;
-      const newlyReached = WBGameState.registerTrophyScore?.(finalScore) || [];
-      _battle.rewards = { trophyScore: finalScore, newlyReachedTiers: newlyReached };
+      const isNewBest = WBGameState.registerTrophyScore?.(finalScore) || false;
+      _battle.rewards = { trophyScore: finalScore, isNewBest };
       _emit(result === 'trophy_end' ? 'trophyEnd' : result, { rewards: _battle.rewards, battle: _battle });
       return;
     }

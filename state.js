@@ -1234,6 +1234,7 @@ const WBGameState = (() => {
       auraTotal:       getPlayerAuraScoreTotal(),
       tourneeProgress: getTourneeProgress(),
       galleryEntries:  Object.keys(_state.player.catalogue || {}).length,
+      trophyBestScore: _state.player.trophy?.bestScore || 0,
     };
   }
 
@@ -1463,24 +1464,46 @@ const WBGameState = (() => {
    * @param {number} finalScore
    * @returns {Array<object>} les paliers NOUVELLEMENT débloqués par ce run
    */
+  /**
+   * À appeler en fin de run Traque avec le score final atteint.
+   * Met uniquement à jour le meilleur score du joueur si dépassé — les
+   * récompenses de palier ne sont PLUS octroyées automatiquement ici, elles
+   * doivent être réclamées manuellement sur l'écran Récompenses (cf.
+   * claimTrophyRewardTier ci-dessous).
+   * @param {number} finalScore
+   * @returns {boolean} true si un nouveau record personnel a été battu
+   */
   function registerTrophyScore(finalScore) {
     const p = _state.player;
     p.trophy = p.trophy || { bestScore: 0, tiersReached: [] };
-    if (finalScore > (p.trophy.bestScore || 0)) p.trophy.bestScore = finalScore;
+    const isNewBest = finalScore > (p.trophy.bestScore || 0);
+    if (isNewBest) p.trophy.bestScore = finalScore;
 
-    const tiers = _state.config.combat?.trophy?.rewardTiers || [];
-    const alreadyReached = new Set(p.trophy.tiersReached || []);
-    const newlyReached = tiers.filter(t => finalScore >= t.score && !alreadyReached.has(t.id));
-
-    newlyReached.forEach(t => {
-      alreadyReached.add(t.id);
-      _grantReward(t.reward);
-    });
-    p.trophy.tiersReached = [...alreadyReached];
-
-    _notify('trophyScoreRegistered', { finalScore, newlyReached });
+    _notify('trophyScoreRegistered', { finalScore, isNewBest });
     _autoSave();
-    return newlyReached;
+    return isNewBest;
+  }
+
+  /**
+   * Réclame manuellement la récompense d'un palier Traque déjà atteint
+   * (score du joueur >= seuil du palier) et pas encore réclamé.
+   * @param {string} tierId
+   * @returns {{success:boolean, reason?:string}}
+   */
+  function claimTrophyRewardTier(tierId) {
+    const p = _state.player;
+    p.trophy = p.trophy || { bestScore: 0, tiersReached: [] };
+    const tier = (_state.config.combat?.trophy?.rewardTiers || []).find(t => t.id === tierId);
+    if (!tier) return { success: false, reason: 'tier_not_found' };
+    if ((p.trophy.bestScore || 0) < tier.score) return { success: false, reason: 'score_too_low' };
+    if ((p.trophy.tiersReached || []).includes(tierId)) return { success: false, reason: 'already_claimed' };
+
+    p.trophy.tiersReached = [...(p.trophy.tiersReached || []), tierId];
+    _grantReward(tier.reward);
+
+    _notify('trophyTierClaimed', { tierId, tier });
+    _autoSave();
+    return { success: true };
   }
 
   /**
@@ -1941,7 +1964,7 @@ const WBGameState = (() => {
     getTourneeProgress, getLeaderboardSnapshot,
     getStoryChapterProgress, completeStoryStage, isFeatureUnlocked,
     addDailyLoginCycle, updateDailyLoginCycle, removeDailyLoginCycle, getDailyLoginClaimable, claimDailyLoginReward,
-    registerTrophyScore,
+    registerTrophyScore, claimTrophyRewardTier,
     addDailyQuest, updateDailyQuest, removeDailyQuest, checkDailyQuests, trackQuestProgress, claimDailyQuest,
     checkWeeklyQuests, claimWeeklyQuest,
     updateBanners, updatePlayer,

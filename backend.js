@@ -19,8 +19,8 @@ const WBBackend = (() => {
   // mêmes comptes joueurs. Crée un nouveau projet sur supabase.com, exécute
   // le script SQL de mise en place des tables (identique à ChronoWaifu, à
   // rejouer sur ce nouveau projet), puis colle ici son URL et sa clé publique.
-  const SUPABASE_URL = 'https://dvssuwhgcxpjdbkqllnt.supabase.co'; // TODO
-  const SUPABASE_KEY = 'sb_publishable_lgqyY4rrTMefClxYclHfpQ_uCX-grLg';                // TODO
+  const SUPABASE_URL = 'https://VOTRE-PROJET-WILDBEAST.supabase.co'; // TODO
+  const SUPABASE_KEY = 'VOTRE_CLE_PUBLIQUE_WILDBEAST';                // TODO
 
   let _client = null;
   let _currentUserId = null;
@@ -185,6 +185,7 @@ const WBBackend = (() => {
       aura_total: stats.auraTotal,
       tournee_progress: stats.tourneeProgress,
       gallery_entries: stats.galleryEntries,
+      trophy_best_score: stats.trophyBestScore,
       updated_at: new Date().toISOString(),
     });
     if (error) console.error('[WBBackend] saveLeaderboardStats:', error);
@@ -192,7 +193,7 @@ const WBBackend = (() => {
 
   /**
    * Charge le classement public, trié par la colonne demandée.
-   * @param {'aura_total'|'tournee_progress'|'gallery_entries'} column
+   * @param {'aura_total'|'tournee_progress'|'gallery_entries'|'trophy_best_score'} column
    * @param {number} [limit=100]
    */
   async function loadLeaderboard(column, limit = 100) {

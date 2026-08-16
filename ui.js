@@ -884,6 +884,7 @@ const WBGameUI = (() => {
         const mode = card.dataset.mode;
         el.classList.remove('active');
         if (mode === 'storyMode') { showScreen('story-chapters'); return; }
+        if (mode === 'trophy') { showScreen('trophy-hub'); return; }
         if (mode === 'story' || mode === 'byLine' || mode === 'arena') {
           _combatMode = mode === 'byLine' ? 'line' : mode;
           _selectedLine = null;
@@ -956,6 +957,8 @@ const WBGameUI = (() => {
       'story-chapters': renderStoryChapters,
       'story-chapter':  () => renderStoryChapter(_storyCurrentChapter),
       leaderboard:      renderLeaderboard,
+      'trophy-hub':     renderTrophyHub,
+      'trophy-rewards': renderTrophyRewards,
     };
     renderers[screenId]?.();
     _setNavActive(screenId);
@@ -1571,6 +1574,12 @@ L'ordre n'a pas d'importance — l'initiative dépend de la <b>Grâce</b> de cha
 <b>🗺️ Territoire</b> — Affronte 6 créatures d'un même type, dans son propre territoire.<br>
 <b>✨ Battue Sauvage</b> — Équipe aléatoire, ennemies du Tag Event uniquement.<br>
 <b>✨ Combat [Tag]</b> — Alliées ET ennemies du Tag Event uniquement. Récompenses bonifiées.`,
+    },
+    trophy: {
+      title: '🎯 Traque',
+      text: `Des vagues de créatures Niveau 1 s'enchaînent à l'infini pendant un nombre de tours limité. Elles n'attaquent jamais — inflige un maximum de dégâts pour faire grimper ton score avant la fin du temps imparti.<br><br>
+Chaque ennemi vaincu est immédiatement remplacé par un nouveau, et rapporte un bonus de points. Aucun XP, Or ou Essence Sauvage n'est gagné sur ce mode — uniquement du score.<br><br>
+Ton meilleur score débloque des paliers de récompense, à réclamer manuellement sur l'écran <b>Récompenses</b> — rien n'est distribué automatiquement en fin de combat.`,
     },
     gacha: {
       title: '💧 Conquêtes — Invocations',
@@ -2404,6 +2413,94 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
 
   // ─── COMBAT ───────────────────────────────────────────────────────────────────
 
+  /** Écran intermédiaire de la Traque : choix entre lancer un combat ou consulter/réclamer les récompenses */
+  function renderTrophyHub() {
+    const el = document.getElementById('screen-trophy-hub');
+    if (!el) return;
+    const state = WBGameState.get();
+    const bestScore = state.player.trophy?.bestScore || 0;
+    const tiers = state.config.combat?.trophy?.rewardTiers || [];
+    const claimable = tiers.filter(t => bestScore >= t.score && !(state.player.trophy?.tiersReached || []).includes(t.id)).length;
+
+    el.innerHTML = `
+      <div class="screen-header"><h2>🎯 Traque</h2>${_helpBtn('trophy')}</div>
+      <div class="trophy-hub-screen">
+        <div class="trophy-hub-best">
+          <div class="trophy-hub-best-label">Meilleur score</div>
+          <div class="trophy-hub-best-value">${bestScore.toLocaleString('fr-FR')}</div>
+        </div>
+        <button class="trophy-hub-btn trophy-hub-btn-combat" id="btn-trophy-hub-combat">
+          <span class="trophy-hub-btn-icon">⚔️</span>
+          <span class="trophy-hub-btn-label">Combat</span>
+          <span class="trophy-hub-btn-desc">Lancer une nouvelle Traque</span>
+        </button>
+        <button class="trophy-hub-btn trophy-hub-btn-rewards" id="btn-trophy-hub-rewards">
+          <span class="trophy-hub-btn-icon">🎁</span>
+          <span class="trophy-hub-btn-label">Récompenses</span>
+          <span class="trophy-hub-btn-desc">${claimable > 0 ? `${claimable} récompense${claimable > 1 ? 's' : ''} à réclamer !` : 'Consulter les paliers'}</span>
+          ${claimable > 0 ? `<span class="trophy-hub-btn-badge">${claimable}</span>` : ''}
+        </button>
+      </div>
+    `;
+
+    document.getElementById('btn-trophy-hub-combat')?.addEventListener('click', () => {
+      showScreen('combat');
+      setTimeout(() => _launchCombat({ mode: 'trophy' }), 100);
+    });
+    document.getElementById('btn-trophy-hub-rewards')?.addEventListener('click', () => {
+      showScreen('trophy-rewards');
+    });
+  }
+
+  /** Écran des récompenses de la Traque — un "totem" de paliers de score, à réclamer manuellement */
+  function renderTrophyRewards() {
+    const el = document.getElementById('screen-trophy-rewards');
+    if (!el) return;
+    const state = WBGameState.get();
+    const bestScore = state.player.trophy?.bestScore || 0;
+    const claimedIds = new Set(state.player.trophy?.tiersReached || []);
+    const tiers = [...(state.config.combat?.trophy?.rewardTiers || [])].sort((a, b) => b.score - a.score); // du plus haut vers le plus bas = "vers le ciel"
+
+    el.innerHTML = `
+      <div class="screen-header"><h2>🎁 Récompenses de la Traque</h2>${_helpBtn('trophy')}</div>
+      <div class="trophy-totem">
+        <div class="trophy-totem-best">🏆 Meilleur score : <strong>${bestScore.toLocaleString('fr-FR')}</strong></div>
+        <div class="trophy-totem-pole">
+          ${tiers.length === 0 ? '<p class="empty-msg">Aucun palier configuré.</p>' : tiers.map(t => {
+            const claimed   = claimedIds.has(t.id);
+            const reachable = bestScore >= t.score;
+            const status    = claimed ? 'claimed' : reachable ? 'claimable' : 'locked';
+            return `
+              <div class="trophy-totem-tier trophy-totem-tier-${status}" data-tier-id="${t.id}">
+                <div class="trophy-totem-tier-score">${t.score.toLocaleString('fr-FR')}</div>
+                <div class="trophy-totem-tier-reward">${_formatRewardLabel(t.reward, state)}</div>
+                ${claimed
+                  ? `<div class="trophy-totem-tier-status">✅ Réclamée</div>`
+                  : reachable
+                    ? `<button class="trophy-totem-claim-btn" data-tier-id="${t.id}">Réclamer</button>`
+                    : `<div class="trophy-totem-tier-status">🔒 ${t.score.toLocaleString('fr-FR')} requis</div>`}
+              </div>`;
+          }).join('')}
+          <div class="trophy-totem-base">🗿</div>
+        </div>
+      </div>
+    `;
+
+    el.querySelectorAll('.trophy-totem-claim-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tierId = btn.dataset.tierId;
+        const res = WBGameState.claimTrophyRewardTier(tierId);
+        if (res.success) {
+          _showToast('🎁 Récompense réclamée !', 'success');
+          _updateHUD();
+          renderTrophyRewards();
+        } else {
+          _showToast('❌ Impossible de réclamer cette récompense.', 'error');
+        }
+      });
+    });
+  }
+
   function renderCombatLobby() {
     const el = document.getElementById('screen-combat');
     if (!el) return;
@@ -3058,7 +3155,6 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       // périmé par une action ultérieure.
       const attackerHpSnapshot = data.attacker.currentHp;
       const targetHpSnapshot   = data.target.currentHp;
-      if (_battle.mode === 'trophy') _updateTrophyScoreHud();
       // Passer l'animation par la queue pour qu'elle attende la précédente
       _queueCombatAnim(() => _playAttackAnimation(data.attacker, data.target, data.result, attackerHpSnapshot, targetHpSnapshot));
     }
@@ -3118,12 +3214,14 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     }
 
     if (event === 'trophyEnemyReplaced') {
-      const card = document.getElementById(`fighter-${data.oldInstanceId}`);
-      if (card) {
-        const idx = _battle.enemyTeam.findIndex(e => e.instanceId === data.newCombatant.instanceId);
-        card.outerHTML = _renderFighter(data.newCombatant, idx);
-      }
-      _updateTrophyScoreHud();
+      _queueCombatAnim(() => {
+        const card = document.getElementById(`fighter-${data.oldInstanceId}`);
+        if (card) {
+          const idx = _battle.enemyTeam.findIndex(e => e.instanceId === data.newCombatant.instanceId);
+          card.outerHTML = _renderFighter(data.newCombatant, idx);
+        }
+        _combatAnimDone();
+      });
     }
 
     if (event === 'error') {
@@ -3190,6 +3288,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
           c.currentHp = saved; // restaurer pour les calculs suivants du moteur
         });
         _renderTurnOrderBar();
+        if (_battle?.mode === 'trophy') _updateTrophyScoreHud();
       };
 
     } else if (effectType === 'end_turn_heal_lowest_ally') {
@@ -3368,6 +3467,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       const portrait = card.querySelector('.fighter-portrait');
       // Chiffre flottant
       if (data.amount != null) _spawnFloatText(card, `-${data.amount}`, 'float-passive-poison', 0, true);
+      if (_battle?.mode === 'trophy') _updateTrophyScoreHud();
       WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.hitNormal);
       // Petite animation poison sur la carte (teinte violette pulsante)
       if (portrait) {
@@ -3776,6 +3876,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     setTimeout(() => targetPortrait?.classList.remove('hit-flash', 'shake-big', 'shake-hit'), 480);
 
     _spawnFloatText(targetCard, `-${result.damage}`, result.critical ? 'float-dmg float-crit-dmg' : 'float-dmg', 0, true);
+    if (_battle?.mode === 'trophy') _updateTrophyScoreHud();
 
     if (result.critical) {
       _spawnFloatText(targetCard, 'CRITIQUE !', 'float-crit-label', 1, true);
@@ -3946,22 +4047,17 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     WBAudioSystem.playResultSfx('victory');
     document.getElementById('trophy-result-overlay')?.remove();
 
-    const finalScore   = data.rewards?.trophyScore || 0;
-    const newTiers     = data.rewards?.newlyReachedTiers || [];
-    const state        = WBGameState.get();
-    const bestScore     = state.player.trophy?.bestScore || 0;
-    const isNewBest     = finalScore >= bestScore && finalScore > 0;
+    const finalScore = data.rewards?.trophyScore || 0;
+    const isNewBest  = data.rewards?.isNewBest || false;
+    const state      = WBGameState.get();
+    const bestScore  = state.player.trophy?.bestScore || 0;
+    const claimable  = (state.config.combat?.trophy?.rewardTiers || [])
+      .filter(t => bestScore >= t.score && !(state.player.trophy?.tiersReached || []).includes(t.id)).length;
 
-    const tiersHtml = newTiers.length ? `
+    const rewardsHint = claimable > 0 ? `
       <div class="bro-levelup-section">
-        <div class="bro-levelup-title">🎁 Palier${newTiers.length > 1 ? 's' : ''} débloqué${newTiers.length > 1 ? 's' : ''} !</div>
-        ${newTiers.map(t => `
-          <div class="bro-levelup-row">
-            <div class="bro-levelup-info">
-              <div class="bro-levelup-name">Score ${t.score.toLocaleString('fr-FR')}</div>
-              <div class="bro-stat-chips"><span class="bro-stat-chip">+${_formatRewardLabel(t.reward, state)}</span></div>
-            </div>
-          </div>`).join('')}
+        <div class="bro-levelup-title">🎁 ${claimable} récompense${claimable > 1 ? 's' : ''} disponible${claimable > 1 ? 's' : ''} !</div>
+        <p style="font-size:.8rem;color:var(--text-dim);text-align:center;margin:4px 0 0">À réclamer manuellement sur l'écran Récompenses.</p>
       </div>` : '';
 
     const shell = document.querySelector('.app-shell') || document.body;
@@ -3981,8 +4077,8 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         <div class="bro-subtitle" style="font-size:1.6rem;font-weight:800;color:var(--accent);margin-top:8px">${finalScore.toLocaleString('fr-FR')}</div>
         ${isNewBest ? `<div class="bro-subtitle" style="margin-top:4px">✨ Nouveau record personnel !</div>` : `<div class="bro-subtitle" style="margin-top:4px">Meilleur score : ${bestScore.toLocaleString('fr-FR')}</div>`}
       </div>
-      ${tiersHtml}
-      <button class="btn-primary bro-back-btn" id="btn-trophy-back">Retour au lobby</button>
+      ${rewardsHint}
+      <button class="btn-primary bro-back-btn" id="btn-trophy-back">Retour</button>
     `;
     shell.appendChild(overlay);
     requestAnimationFrame(() => requestAnimationFrame(() => { overlay.style.opacity = '1'; }));
@@ -3995,7 +4091,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         _battle = null;
         document.body.classList.remove('battle-active');
         WBAudioSystem.playGlobal();
-        _showCombatSelect();
+        showScreen('trophy-hub');
       }, 500);
     });
   }
@@ -5774,6 +5870,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     { col: 'aura_total',       label: '⭐ Attrait', unit: '⭐' },
     { col: 'tournee_progress', label: '🌍 Expédition', unit: '🌍 Niv.' },
     { col: 'gallery_entries',  label: '📚 Encyclopédie', unit: '📚' },
+    { col: 'trophy_best_score', label: '🎯 Traque', unit: '🎯' },
   ];
 
   function renderLeaderboard() {
