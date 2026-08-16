@@ -2361,40 +2361,61 @@ const WBAdminPanel = (() => {
     const charPrices = { common:80, uncommon:200, rare:500, epic:1500, legendary:4000, mythic:10000 };
     const equipPrices = { common:150, uncommon:400, rare:1000, epic:3000, legendary:8000, mythic:20000 };
 
-    // 1 — Supprimer tous les listings créature et équipement existants
+    // Noms d'objets qui doivent être en boutique permanente (comparaison insensible
+    // à la casse et aux accents) — ces objets ne sont PAS touchés/recréés ici, on
+    // met juste à jour leur statut "permanent" s'ils existent déjà en boutique.
+    const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const PERMANENT_ITEM_NAMES = ['pilule de puissance', 'potion d\'energie'].map(normalize);
+
+    // 1 — Supprimer tous les listings créature et équipement existants (objets jamais touchés)
     const toDelete = state.shopListings
       .filter(l => l.kind === 'character' || l.kind === 'equipment')
       .map(l => l.id);
     toDelete.forEach(id => WBGameState.removeShopListing(id));
 
-    // 2 — Ajouter toutes les formes de base des créatures
+    // 2 — Ajouter toutes les formes de base des créatures (boutique permanente : NON)
     const baseChars = state.characters.filter(c => (c.evolutionStage ?? 0) === 0);
     baseChars.forEach(c => {
       const price = charPrices[c.rarity] ?? 100;
       WBGameState.addShopListing({
-        id:       `shop_char_${c.id}`,
-        kind:     'character',
-        refId:    c.id,
+        id:        `shop_char_${c.id}`,
+        kind:      'character',
+        refId:     c.id,
         price,
-        currency: 'crystals',
-        enabled:  true,
+        currency:  'crystals',
+        enabled:   true,
+        permanent: false,
       });
     });
 
-    // 3 — Ajouter tous les équipements
+    // 3 — Ajouter tous les équipements (boutique permanente : NON)
     state.equipment.forEach(e => {
       const price = equipPrices[e.rarity] ?? 150;
       WBGameState.addShopListing({
-        id:       `shop_equip_${e.id}`,
-        kind:     'equipment',
-        refId:    e.id,
+        id:        `shop_equip_${e.id}`,
+        kind:      'equipment',
+        refId:     e.id,
         price,
-        currency: 'gold',
-        enabled:  true,
+        currency:  'gold',
+        enabled:   true,
+        permanent: false,
       });
     });
 
-    _notify(`✅ Shop mis à jour : ${baseChars.length} créatures + ${state.equipment.length} équipements.`);
+    // 4 — Exception : les objets déjà en boutique correspondant aux noms protégés
+    // repassent en boutique permanente OUI (sans être supprimés/recréés).
+    let exceptionCount = 0;
+    state.shopListings
+      .filter(l => l.kind === 'item')
+      .forEach(l => {
+        const ref = state.items.find(i => i.id === l.refId);
+        if (ref && PERMANENT_ITEM_NAMES.includes(normalize(ref.name))) {
+          WBGameState.updateShopListing(l.id, { permanent: true });
+          exceptionCount++;
+        }
+      });
+
+    _notify(`✅ Shop mis à jour : ${baseChars.length} créatures + ${state.equipment.length} équipements (${exceptionCount} objet(s) passé(s) en permanent).`);
     switchTab('shop');
   }
 

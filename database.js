@@ -335,6 +335,7 @@ const WBGameDatabase = (() => {
     stat_boost_crit_damage:    { label: 'Frappe au cœur (critiques)',            params: ['percent'] },
     on_damaged_counter:        { label: 'Riposte instinctive',       params: ['chance'] },
     on_hit_charm:              { label: 'Ensorcelleuse au contact',                          params: ['chance'] },
+    on_damaged_reduce_dmg:     { label: 'Carapace endurcie (réduction de dégâts)', params: ['chance', 'reducePercent'] },
   };
 
   const DEFAULT_PASSIVES = [

@@ -1334,9 +1334,24 @@ const WBCombatEngine = (() => {
     const playerBonus = (!attacker.isEnemy && target.isEnemy) ? (cfg.playerDmgBonus ?? 1.15) : 1;
     const enemyPenalty = (attacker.isEnemy && !target.isEnemy) ? (cfg.enemyDmgPenalty ?? 0.80) : 1;
 
+    // ── Passif défensif : Carapace endurcie (réduction de dégâts subis) ──────
+    const carapace = _findPassive(target, 'on_damaged_reduce_dmg');
+    const carapaceTriggered = !!(carapace && _rollChance(carapace.params.chance));
+    const reduceFactor = carapaceTriggered ? (1 - (carapace.params.reducePercent / 100)) : 1;
+
     // ── Calcul final ────────────────────────────────────────────────────────
-    const rawDamage = afterVariance * mult * critFactor * playerBonus * enemyPenalty;
+    const rawDamage = afterVariance * mult * critFactor * playerBonus * enemyPenalty * reduceFactor;
     const damage    = Math.max(cfg.minDamage ?? 1, Math.floor(rawDamage));
+
+    if (carapaceTriggered) {
+      _battle.log.push(`🛡️ ${target.name} active Carapace endurcie et réduit les dégâts de ${carapace.params.reducePercent}% !`);
+      _emit('passiveTriggered', {
+        combatantId: target.instanceId, isEnemy: target.isEnemy,
+        passiveId: carapace.id, passiveName: carapace.name,
+        message: `${target.name} active Carapace endurcie !`,
+        extra: { targetId: target.instanceId },
+      });
+    }
 
     const hpBefore        = target.currentHp;
     target.currentHp = Math.max(0, target.currentHp - damage);

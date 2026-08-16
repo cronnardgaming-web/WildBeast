@@ -3306,6 +3306,12 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.hitResist);
       };
 
+    } else if (effectType === 'on_damaged_reduce_dmg') {
+      onFxStart = () => {
+        _spawnPassiveFx(sourceCard, 'adorable');
+        WBAudioSystem.playSfx(WBAudioSystem.SFX_KEYS.hitResist);
+      };
+
     } else if (effectType === 'stat_boost_crit_damage') {
       onFxStart = () => {
         _spawnPassiveFx(sourceCard, 'scenique');
