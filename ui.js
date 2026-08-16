@@ -2080,6 +2080,18 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       || `<div class="portrait-ph">${(def?.name||'?').charAt(0)}</div>`;
   }
 
+  /** Bonus d'un équipement ajustés selon le niveau de CET exemplaire précis (pas la valeur brute de la fiche) */
+  function _scaledEquipBonuses(def, invInst) {
+    const mult = WBGameDatabase.equipLevelMultiplier(invInst?.level);
+    const b = def.bonuses || {};
+    return {
+      hp:  Math.round((b.hp  || 0) * mult),
+      atk: Math.round((b.atk || 0) * mult),
+      def: Math.round((b.def || 0) * mult),
+      spd: Math.round((b.spd || 0) * mult),
+    };
+  }
+
   function _formatEquipBonuses(bonuses) {
     return Object.entries(bonuses)
       .filter(([,v]) => v !== 0)
@@ -4803,11 +4815,11 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
 
     // 3. Classer les items de chaque type par score total de bonus (décroissant)
     const weaponPool    = inv.filter(ei => { const d = state.equipment.find(e => e.id === ei.equipId); return d && WBGameDatabase.resolveEquipSlot(d) === 'weapon'; })
-                             .sort((a, b) => { const da = state.equipment.find(e => e.id === a.equipId); const db = state.equipment.find(e => e.id === b.equipId); return _itemScore(db) - _itemScore(da); });
+                             .sort((a, b) => { const da = state.equipment.find(e => e.id === a.equipId); const db = state.equipment.find(e => e.id === b.equipId); return _itemScore(db, b) - _itemScore(da, a); });
     const armorPool     = inv.filter(ei => { const d = state.equipment.find(e => e.id === ei.equipId); return d && WBGameDatabase.resolveEquipSlot(d) === 'armor'; })
-                             .sort((a, b) => { const da = state.equipment.find(e => e.id === a.equipId); const db = state.equipment.find(e => e.id === b.equipId); return _itemScore(db) - _itemScore(da); });
+                             .sort((a, b) => { const da = state.equipment.find(e => e.id === a.equipId); const db = state.equipment.find(e => e.id === b.equipId); return _itemScore(db, b) - _itemScore(da, a); });
     const accessoryPool = inv.filter(ei => { const d = state.equipment.find(e => e.id === ei.equipId); return d && WBGameDatabase.resolveEquipSlot(d) === 'accessory'; })
-                             .sort((a, b) => { const da = state.equipment.find(e => e.id === a.equipId); const db = state.equipment.find(e => e.id === b.equipId); return _itemScore(db) - _itemScore(da); });
+                             .sort((a, b) => { const da = state.equipment.find(e => e.id === a.equipId); const db = state.equipment.find(e => e.id === b.equipId); return _itemScore(db, b) - _itemScore(da, a); });
 
     const pools = [weaponPool, armorPool, accessoryPool];
     const poolIdx = [0, 0, 0];
@@ -4837,8 +4849,9 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   }
 
   /** Calcule le score total (somme des bonus) d'une définition d'équipement */
-  function _itemScore(def) {
-    return Object.values(def?.bonuses || {}).reduce((s, v) => s + (v || 0), 0);
+  function _itemScore(def, invInst) {
+    const b = invInst ? _scaledEquipBonuses(def, invInst) : (def?.bonuses || {});
+    return Object.values(b).reduce((s, v) => s + (v || 0), 0);
   }
 
   /** Affiche (ou efface) le résumé inline du dernier équipement automatique */
@@ -5033,11 +5046,14 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
    * @returns {Array<{invInst, def, instances:Array, count:number, stacked:boolean}>}
    */
   function _groupEquipStacks(items) {
-    // On groupe TOUS les items par equipId (nom), qu'ils soient équipés ou non.
+    // On groupe par equipId ET par niveau (deux exemplaires du même objet mais
+    // de niveau différent ont des stats différentes : ne jamais les confondre
+    // dans une même pile), qu'ils soient équipés ou non.
     const groups = {};
     items.forEach(({ invInst, def }) => {
-      if (!groups[def.id]) groups[def.id] = { def, instances: [] };
-      groups[def.id].instances.push(invInst);
+      const key = `${def.id}__${invInst.level ?? 'mythic'}`;
+      if (!groups[key]) groups[key] = { def, instances: [] };
+      groups[key].instances.push(invInst);
     });
     return Object.values(groups).map(group => {
       // Préférer un exemplaire NON équipé comme représentant du groupe (plus utile
@@ -5087,24 +5103,26 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     const inst = _equipCharId ? WBGameState.getPlayerChar(_equipCharId) : null;
     const slotMatchesOpenSlot = !!(inst && _equipSlotOpen !== null && EQUIP_SLOT_ORDER[_equipSlotOpen] === _equipInvTab);
     let currentDef = null;
+    let currentEntry = null;
     if (slotMatchesOpenSlot) {
       const currentInvId = inst.equipment?.[_equipSlotOpen] || null;
-      const currentEntry = currentInvId ? state.player.equipInventory.find(ei => ei.instanceId === currentInvId) : null;
+      currentEntry = currentInvId ? state.player.equipInventory.find(ei => ei.instanceId === currentInvId) : null;
       currentDef = currentEntry ? state.equipment.find(e => e.id === currentEntry.equipId) : null;
     }
 
     grid.innerHTML = sorted.map(({ invInst, def, count, stacked }) => {
       const holder = !stacked ? _describeEquippedBy(invInst.equippedBy) : null;
       const usedElsewhere = !stacked && invInst.equippedBy && invInst.equippedBy !== _equipCharId;
-      const isUpgrade = slotMatchesOpenSlot && !usedElsewhere && (!currentDef || _itemScore(def) > _itemScore(currentDef));
+      const isUpgrade = slotMatchesOpenSlot && !usedElsewhere && (!currentDef || _itemScore(def, invInst) > _itemScore(currentDef, currentEntry));
       const clickable = slotMatchesOpenSlot && !usedElsewhere;
       return `
         <div class="equip-inv-card rarity-${def.rarity} ${isUpgrade ? 'is-upgrade' : ''}"
              data-inst-id="${invInst.instanceId}" data-equip-id="${def.id}"
              ${clickable ? 'style="cursor:pointer"' : ''}>
           ${count > 1 ? `<div class="equip-inv-stack-badge">×${count}</div>` : ''}
+          ${invInst.level != null ? `<div class="equip-inv-level">Niv. ${invInst.level}</div>` : ''}
           <div class="equip-inv-name">${def.name}</div>
-          <div class="equip-inv-bonuses">${_formatEquipBonuses(def.bonuses)}</div>
+          <div class="equip-inv-bonuses">${_formatEquipBonuses(_scaledEquipBonuses(def, invInst))}</div>
           ${isUpgrade ? '<div class="equip-upgrade-hint">⬆ Amélioration</div>' : ''}
           ${holder ? `
             <div class="equip-inv-holder" title="Équipé par ${holder.name}">
@@ -5282,8 +5300,9 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
              data-inst-id="${invInst.instanceId}"
              style="${isCurrent ? 'opacity:.5;pointer-events:none' : 'cursor:pointer'}">
           ${count > 1 ? `<div class="equip-inv-stack-badge">×${count}</div>` : ''}
+          ${invInst.level != null ? `<div class="equip-inv-level">Niv. ${invInst.level}</div>` : ''}
           <div class="equip-inv-name">${def.name}</div>
-          <div class="equip-inv-bonuses">${_formatEquipBonuses(def.bonuses)}</div>
+          <div class="equip-inv-bonuses">${_formatEquipBonuses(_scaledEquipBonuses(def, invInst))}</div>
           ${isCurrent ? '<div style="font-size:.62rem;color:var(--accent);margin-top:4px">Actuellement équipé</div>' : _buildEquipCompareHtml(currentDef, def)}
         </div>`;
     }).join('');
@@ -5389,6 +5408,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     const instance = {
       instanceId: `einst_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       equipId:    def.id,
+      level:      WBGameDatabase.rollEquipLevel(def.rarity),
       obtainedAt: Date.now(),
       equippedBy: null,
     };

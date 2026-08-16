@@ -1023,6 +1023,30 @@ const WBGameDatabase = (() => {
      * @param {Array<object>} equipmentDefs  - état.equipment (définitions)
      * @returns {{hp:number, atk:number, def:number, spd:number}}
      */
+    /**
+     * Tire un niveau aléatoire pour un nouvel exemplaire d'équipement (1-10).
+     * Exception : les équipements Mythiques n'ont PAS de niveau (null) — leurs
+     * stats en base de données s'appliquent telles quelles, sans variation.
+     * Un système de fusion dédié aux Mythiques viendra plus tard.
+     * @param {string} rarity
+     * @returns {number|null}
+     */
+    rollEquipLevel(rarity) {
+      if (rarity === 'mythic') return null;
+      return 1 + Math.floor(Math.random() * 10);
+    },
+
+    /**
+     * Multiplicateur de stats selon le niveau d'un exemplaire (niveau 5 =
+     * référence ×1, ±10% par niveau d'écart). null/undefined = ×1 (Mythiques).
+     * @param {number|null} level
+     * @returns {number}
+     */
+    equipLevelMultiplier(level) {
+      if (level == null) return 1;
+      return 1 + (level - 5) * 0.10;
+    },
+
     computeEquipBonus(equipmentRefs, equipInventory, equipmentDefs) {
       const bonus = { hp: 0, atk: 0, def: 0, spd: 0 };
       if (!equipmentRefs) return bonus;
@@ -1035,10 +1059,11 @@ const WBGameDatabase = (() => {
         const invEntry = (equipInventory || []).find(ei => ei.instanceId === refId);
         const def = invEntry ? (equipmentDefs || []).find(e => e.id === invEntry.equipId) : null;
         if (def?.bonuses) {
-          bonus.hp  += def.bonuses.hp  || 0;
-          bonus.atk += def.bonuses.atk || 0;
-          bonus.def += def.bonuses.def || 0;
-          bonus.spd += def.bonuses.spd || 0;
+          const mult = this.equipLevelMultiplier(invEntry?.level);
+          bonus.hp  += Math.round((def.bonuses.hp  || 0) * mult);
+          bonus.atk += Math.round((def.bonuses.atk || 0) * mult);
+          bonus.def += Math.round((def.bonuses.def || 0) * mult);
+          bonus.spd += Math.round((def.bonuses.spd || 0) * mult);
         }
       });
       return bonus;

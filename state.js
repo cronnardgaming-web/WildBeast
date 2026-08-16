@@ -875,9 +875,11 @@ const WBGameState = (() => {
     }
 
     if (listing.kind === 'equipment') {
+      const equipDef = _state.equipment.find(e => e.id === listing.refId);
       const instance = {
         instanceId: `einst_${Date.now()}_${Math.random().toString(36).slice(2)}`,
         equipId:    listing.refId,
+        level:      WBGameDatabase.rollEquipLevel(equipDef?.rarity),
         obtainedAt: Date.now(),
         equippedBy: null,
       };
@@ -917,11 +919,13 @@ const WBGameState = (() => {
       inv[reward.refId] = (inv[reward.refId] || 0) + amount;
       _state.player.inventory = inv;
     } else if (reward.type === 'equipment' && reward.refId) {
+      const equipDef = _state.equipment.find(e => e.id === reward.refId);
       const newInstances = [];
       for (let i = 0; i < amount; i++) {
         newInstances.push({
           instanceId: `einst_${Date.now()}_${i}_${Math.random().toString(36).slice(2)}`,
           equipId:    reward.refId,
+          level:      WBGameDatabase.rollEquipLevel(equipDef?.rarity),
           obtainedAt: Date.now(),
           equippedBy: null,
         });
