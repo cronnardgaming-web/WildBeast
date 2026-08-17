@@ -756,6 +756,7 @@ const WBGameDatabase = (() => {
       bestScore: 0,          // Meilleur score jamais atteint
       tiersReached: [],       // IDs des paliers de récompense déjà débloqués (une seule fois chacun)
     },
+    permanentQuestsClaimed: [], // IDs des paliers de quêtes Permanentes déjà réclamés (une seule fois chacun)
     dailyLogin: {           // Progression des cycles de récompense de connexion quotidienne
       progress: {},         // { [cycleId]: { currentDay: 1, lastClaimDate: 'YYYY-MM-DD'|null } }
     },
@@ -881,11 +882,12 @@ const WBGameDatabase = (() => {
   const QUEST_TYPES = {
     capture_character:     { label: 'Capturer des créatures (combat)' },
     defeat_enemies:        { label: 'Remporter des combats' },
-    summon_equipment:      { label: 'Débloquer des équipements (Expédition)' },
-    summon_character:      { label: 'Faire des rencontres (Expédition)' },
+    summon_equipment:      { label: 'Tirer sur le Défilé d\'Équipements' },
+    summon_character:      { label: 'Utiliser le Signal (invocation)' },
     win_line_combat:       { label: 'Triompher en combat de Lignée' },
     win_full_random_combat:{ label: 'Réussir des Battues Sauvages' },
     win_odyssey_combat:    { label: 'Réussir des Expéditions' },
+    play_trophy:           { label: 'Faire une Traque', weeklyOnly: true },
     complete_daily_quests: { label: 'Terminer toutes les quêtes Quotidiennes' },
     complete_weekly_quests:{ label: 'Terminer toutes les quêtes Hebdomadaires' },
     complete_event_quests: { label: 'Terminer toutes les quêtes d\'Event' },
@@ -930,9 +932,43 @@ const WBGameDatabase = (() => {
     { id: "quest_summon_char_10", type: "summon_character", target: 10, name: "Faire 10 rencontres", enabled: true, reward: { type: "crystals", amount: 550 } },
     { id: "quest_line_1", type: "win_line_combat", target: 1, name: "Triompher d'1 Élevage", enabled: true, reward: { type: "gold", amount: 150 } },
     { id: "quest_line_3", type: "win_line_combat", target: 3, name: "Triompher de 3 Élevages", enabled: true, reward: { type: "gold", amount: 400 } },
-    { id: "quest_fullrandom_1", type: "win_full_random_combat", target: 1, name: "Réussir 1 Caprice", enabled: true, reward: { type: "gold", amount: 150 } },
-    { id: "quest_fullrandom_3", type: "win_full_random_combat", target: 3, name: "Réussir 3 Caprices", enabled: true, reward: { type: "gold", amount: 400 } },
-    { id: "quest_odyssey_1", type: "win_odyssey_combat", target: 1, name: "Réussir 1 Tournée", enabled: true, reward: { type: "item", amount: 3, refId: "item_energy_potion" } },
+    { id: "quest_fullrandom_1", type: "win_full_random_combat", target: 1, name: "Réussir 1 Battue", enabled: true, reward: { type: "gold", amount: 150 } },
+    { id: "quest_fullrandom_3", type: "win_full_random_combat", target: 3, name: "Réussir 3 Battues", enabled: true, reward: { type: "gold", amount: 400 } },
+    { id: "quest_odyssey_1", type: "win_odyssey_combat", target: 1, name: "Réussir 1 Expédition", enabled: true, reward: { type: "item", amount: 3, refId: "item_energy_potion" } },
+  ];
+
+  // ─── QUÊTES PERMANENTES (paliers progressifs, jamais de reset) ───────────────
+  // Chaque quête a plusieurs paliers indépendants, réclamables une seule fois
+  // chacun dès que la valeur "en direct" du joueur (cf. state.js getLiveStatValue)
+  // atteint le seuil. statKey doit correspondre à une des clés déjà utilisées
+  // pour le bonus de stats (battles, victories, kills, captures, pulls,
+  // evolutions, awakenings, tourneeProgress, galleryEntries, trophyBestScore,
+  // collectionSize, playerLevel, scoreTotal, scoreTeam).
+  const DEFAULT_PERMANENT_QUESTS = [
+    {
+      id: 'perm_collection', name: 'Collectionneuse', statKey: 'collectionSize',
+      tiers: [
+        { id: 'perm_collection_1', threshold: 10,  reward: { type: 'gold', amount: 300 } },
+        { id: 'perm_collection_2', threshold: 50,  reward: { type: 'crystals', amount: 200 } },
+        { id: 'perm_collection_3', threshold: 100, reward: { type: 'crystals', amount: 500 } },
+      ],
+    },
+    {
+      id: 'perm_captures', name: 'Apprivoiseuse', statKey: 'captures',
+      tiers: [
+        { id: 'perm_captures_1', threshold: 25,  reward: { type: 'gold', amount: 400 } },
+        { id: 'perm_captures_2', threshold: 100, reward: { type: 'crystals', amount: 300 } },
+        { id: 'perm_captures_3', threshold: 250, reward: { type: 'crystals', amount: 800 } },
+      ],
+    },
+    {
+      id: 'perm_level', name: 'Vétérane', statKey: 'playerLevel',
+      tiers: [
+        { id: 'perm_level_1', threshold: 25, reward: { type: 'gold', amount: 500 } },
+        { id: 'perm_level_2', threshold: 50, reward: { type: 'crystals', amount: 400 } },
+        { id: 'perm_level_3', threshold: 100, reward: { type: 'crystals', amount: 1000 } },
+      ],
+    },
   ];
 
   // ─── BANNIÈRE GACHA ÉQUIPEMENTS ───────────────────────────────────────────────

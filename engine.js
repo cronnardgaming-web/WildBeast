@@ -1466,6 +1466,7 @@ const WBCombatEngine = (() => {
     if (_battle.mode === 'trophy') {
       const finalScore = _battle.trophyScore || 0;
       const isNewBest = WBGameState.registerTrophyScore?.(finalScore) || false;
+      WBGameState.trackQuestProgress('play_trophy');
       _battle.rewards = { trophyScore: finalScore, isNewBest };
       _emit(result === 'trophy_end' ? 'trophyEnd' : result, { rewards: _battle.rewards, battle: _battle });
       return;

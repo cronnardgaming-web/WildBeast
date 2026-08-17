@@ -37,7 +37,7 @@ const WBAdminPanel = (() => {
     // ── Mécanique ────────────────────────────────────────────────────────────
     { id: 'gacha',      label: '🎲 Gacha',       group: 'Mécanique'  },
     { id: 'event',      label: '✨ Event',        group: 'Mécanique'  },
-    { id: 'daily',      label: '📅 Quotidien',   group: 'Mécanique'  },
+    { id: 'daily',      label: '📜 Quêtes',      group: 'Mécanique'  },
     { id: 'attacks',    label: '💥 Passifs',      group: 'Mécanique'  },
     { id: 'combat',     label: '⚔️ Combat',       group: 'Mécanique'  },
     { id: 'trophy',     label: '🎯 Traque',       group: 'Mécanique'  },
@@ -2584,18 +2584,24 @@ const WBAdminPanel = (() => {
     const quests = state.dailyQuests;
     const wQuests = state.weeklyQuests || [];
     const QUEST_TYPES = WBGameDatabase.QUEST_TYPES;
+    // Quotidien : toutes les mécaniques SAUF celles réservées à l'Hebdo (ex: Traque)
+    const QUEST_TYPES_DAILY = Object.fromEntries(Object.entries(QUEST_TYPES).filter(([, def]) => !def.weeklyOnly));
 
     // Onglets internes
     const subTab = _dailySubTab || 'daily';
 
     const subTabHtml = `
-      <div style="display:flex;gap:6px;margin-bottom:16px">
+      <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
         <button class="admin-btn ${subTab==='daily'?'admin-btn-primary':'admin-btn-secondary'}" onclick="WBAdminPanel._setDailySubTab('daily')">📅 Quotidien</button>
         <button class="admin-btn ${subTab==='weekly'?'admin-btn-primary':'admin-btn-secondary'}" onclick="WBAdminPanel._setDailySubTab('weekly')">📆 Hebdomadaire</button>
+        <button class="admin-btn ${subTab==='permanent'?'admin-btn-primary':'admin-btn-secondary'}" onclick="WBAdminPanel._setDailySubTab('permanent')">🏆 Permanentes</button>
       </div>`;
 
     if (subTab === 'weekly') {
       return subTabHtml + _renderWeeklyQuestSection(wQuests, QUEST_TYPES);
+    }
+    if (subTab === 'permanent') {
+      return subTabHtml + _renderPermanentQuestSection();
     }
 
     // ── Section Quotidien ──
@@ -2660,7 +2666,7 @@ const WBAdminPanel = (() => {
         <div class="admin-grid">
           <div class="admin-field"><label>Mécanique trackée</label>
             <select id="quest-type">
-              ${Object.entries(QUEST_TYPES).map(([key, def]) => `<option value="${key}">${def.label}</option>`).join('')}
+              ${Object.entries(QUEST_TYPES_DAILY).map(([key, def]) => `<option value="${key}">${def.label}</option>`).join('')}
             </select>
           </div>
           <div class="admin-field"><label>Nom affiché</label><input type="text" id="quest-name" placeholder="Apprivoiser 5 créatures" /></div>
@@ -2735,6 +2741,165 @@ const WBAdminPanel = (() => {
         <div class="admin-section-title">Quêtes hebdomadaires (${wQuests.length})</div>
         <div class="admin-list">${questList || '<p style="color:#888;font-size:.85rem;">Aucune quête hebdomadaire.</p>'}</div>
       </div>`;
+  }
+
+  // ── Quêtes Permanentes (paliers progressifs, jamais de reset) ──
+
+  const PERMANENT_STAT_KEYS = {
+    captures:        '🐾 Apprivoisements',
+    pulls:           '💧 Invocations (Signal)',
+    battles:         '⚔️ Combats livrés',
+    victories:       '🏆 Victoires',
+    kills:           '💥 Ennemis vaincus',
+    evolutions:      '✨ Évolutions',
+    awakenings:      '⭐ Éveils',
+    collectionSize:  '📚 Créatures possédées',
+    playerLevel:     '🎖️ Niveau du joueur',
+    tourneeProgress: '🌍 Sous-niveaux Expédition complétés',
+    galleryEntries:  '📖 Entrées Encyclopédie',
+    trophyBestScore: '🎯 Meilleur score Traque',
+    scoreTotal:      '⭐ Attrait total',
+    scoreTeam:       '👑 Attrait d\'équipe',
+  };
+
+  function _renderPermanentQuestSection() {
+    const state  = WBGameState.get();
+    const quests = state.permanentQuests || [];
+    const editing = _permanentQuestEditingId ? quests.find(q => q.id === _permanentQuestEditingId) : null;
+    const tiers = editing ? editing.tiers : (_permanentQuestDraftTiers || []);
+
+    const questList = quests.map(q => `
+      <div class="admin-list-item">
+        <div class="admin-list-item-info">
+          <div class="admin-list-item-name">${q.name}</div>
+          <div class="admin-list-item-sub">${PERMANENT_STAT_KEYS[q.statKey] || q.statKey} — ${(q.tiers || []).length} palier(s) : ${(q.tiers || []).map(t => t.threshold).join(' / ')}</div>
+        </div>
+        <div class="admin-list-item-actions">
+          <button class="admin-btn admin-btn-primary admin-btn-sm" onclick="WBAdminPanel._editPermanentQuest('${q.id}')">✏️</button>
+          <button class="admin-btn admin-btn-danger admin-btn-sm" onclick="WBAdminPanel._deletePermanentQuest('${q.id}')">🗑️</button>
+        </div>
+      </div>`).join('');
+
+    return `
+      <div class="admin-section">
+        <div class="admin-section-title">🏆 Quête Permanente ${editing ? `— édition « ${editing.name} »` : '(nouvelle)'}</div>
+        <p style="font-size:.78rem;color:#888;margin-bottom:12px;">
+          Jamais de reset. Chaque palier se compare à une valeur "en direct" du joueur (pas un compteur qui repart à zéro) et se réclame une seule fois, indépendamment des autres paliers de la même quête.
+        </p>
+        <div class="admin-grid">
+          <div class="admin-field"><label>ID</label><input type="text" id="permquest-id" placeholder="perm_xxx" value="${editing?.id || ''}" ${editing ? 'readonly style="opacity:.6"' : ''} /></div>
+          <div class="admin-field"><label>Nom affiché</label><input type="text" id="permquest-name" placeholder="Collectionneuse" value="${editing?.name || ''}" /></div>
+          <div class="admin-field"><label>Statistique suivie</label>
+            <select id="permquest-statkey">
+              ${Object.entries(PERMANENT_STAT_KEYS).map(([key, label]) => `<option value="${key}" ${editing?.statKey === key ? 'selected' : ''}>${label}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div class="admin-section-title" style="margin-top:16px;font-size:.85rem">🎁 Paliers</div>
+        <div id="permquest-tiers-rows">
+          ${tiers.map((t, i) => `
+            <div class="cycle-day-row permquest-tier-row" data-tier-idx="${i}" data-tier-id="${t.id}" style="margin-bottom:8px;padding:8px;background:#1a1630;border-radius:6px">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="min-width:50px;font-weight:700;font-size:.8rem">Seuil ≥</span>
+                <input type="number" class="permquest-tier-threshold" value="${t.threshold}" min="0" style="width:110px">
+                ${_buildRewardEditorHtml(`permquest-tier-${i}`, t.reward)}
+                <button class="admin-btn admin-btn-danger admin-btn-sm" onclick="WBAdminPanel._removePermanentQuestTierRow(${i})">🗑️</button>
+              </div>
+            </div>`).join('')}
+        </div>
+        <button class="admin-btn admin-btn-secondary admin-btn-sm" onclick="WBAdminPanel._addPermanentQuestTierRow()">+ Palier</button>
+
+        <div class="admin-actions" style="margin-top:14px">
+          <button class="admin-btn admin-btn-success" onclick="WBAdminPanel._savePermanentQuest()">💾 Enregistrer</button>
+          <button class="admin-btn admin-btn-primary" onclick="WBAdminPanel._clearPermanentQuestForm()">🗑️ Vider / Nouvelle</button>
+        </div>
+      </div>
+      <hr class="admin-sep" />
+      <div class="admin-section">
+        <div class="admin-section-title">Quêtes Permanentes existantes (${quests.length})</div>
+        <div class="admin-list">${questList || '<p style="color:#888;font-size:.85rem;">Aucune quête permanente.</p>'}</div>
+      </div>`;
+  }
+
+  let _permanentQuestEditingId = null;
+  let _permanentQuestDraftTiers = [];
+
+  /** Ajoute une ligne de palier vide au formulaire en cours (édition ou nouvelle quête) */
+  function _addPermanentQuestTierRow() {
+    const quests = WBGameState.get().permanentQuests || [];
+    const editing = _permanentQuestEditingId ? quests.find(q => q.id === _permanentQuestEditingId) : null;
+    const tiers = editing ? [...editing.tiers] : [..._permanentQuestDraftTiers];
+    const lastThreshold = tiers.length ? tiers[tiers.length - 1].threshold : 0;
+    tiers.push({ id: `${_permanentQuestEditingId || 'perm_new'}_${Date.now()}`, threshold: lastThreshold + 10, reward: { type: 'gold', amount: 100 } });
+    if (editing) { editing.tiers = tiers; } else { _permanentQuestDraftTiers = tiers; }
+    switchTab('daily');
+  }
+
+  /** Supprime une ligne de palier (par son index affiché) du formulaire en cours */
+  function _removePermanentQuestTierRow(idx) {
+    const quests = WBGameState.get().permanentQuests || [];
+    const editing = _permanentQuestEditingId ? quests.find(q => q.id === _permanentQuestEditingId) : null;
+    const tiers = editing ? [...editing.tiers] : [..._permanentQuestDraftTiers];
+    tiers.splice(idx, 1);
+    if (editing) { editing.tiers = tiers; } else { _permanentQuestDraftTiers = tiers; }
+    switchTab('daily');
+  }
+
+  /** Enregistre la quête Permanente en cours d'édition (nouvelle ou existante) */
+  function _savePermanentQuest() {
+    const id = document.getElementById('permquest-id')?.value.trim();
+    const name = document.getElementById('permquest-name')?.value.trim();
+    if (!id || !name) { _notify('❌ ID et nom obligatoires.', 'error'); return; }
+
+    const tiers = Array.from(document.querySelectorAll('.permquest-tier-row')).map(row => ({
+      id:        row.dataset.tierId,
+      threshold: parseInt(row.querySelector('.permquest-tier-threshold')?.value || '0'),
+      reward:    _readRewardFromEditor(`permquest-tier-${row.dataset.tierIdx}`),
+    })).sort((a, b) => a.threshold - b.threshold);
+
+    if (tiers.length === 0) { _notify('❌ Ajoute au moins un palier.', 'error'); return; }
+
+    const data = {
+      id, name,
+      statKey: document.getElementById('permquest-statkey')?.value,
+      tiers,
+    };
+
+    if (_permanentQuestEditingId) {
+      WBGameState.updatePermanentQuest(_permanentQuestEditingId, data);
+      _notify(`✅ Quête Permanente « ${name} » mise à jour.`);
+    } else {
+      if ((WBGameState.get().permanentQuests || []).some(q => q.id === id)) {
+        _notify('❌ Cet ID existe déjà.', 'error'); return;
+      }
+      WBGameState.addPermanentQuest(data);
+      _notify(`✅ Quête Permanente « ${name} » créée.`);
+    }
+    _clearPermanentQuestForm();
+  }
+
+  /** Charge une quête Permanente existante dans le formulaire pour édition */
+  function _editPermanentQuest(id) {
+    _permanentQuestEditingId = id;
+    _permanentQuestDraftTiers = [];
+    switchTab('daily');
+  }
+
+  /** Supprime une quête Permanente */
+  function _deletePermanentQuest(id) {
+    if (!confirm('Supprimer cette quête Permanente ? Les paliers déjà réclamés par les joueurs resteront acquis, mais la quête disparaîtra de l\'admin.')) return;
+    WBGameState.removePermanentQuest(id);
+    if (_permanentQuestEditingId === id) _permanentQuestEditingId = null;
+    _notify('🗑️ Quête Permanente supprimée.');
+    switchTab('daily');
+  }
+
+  /** Vide le formulaire de quête Permanente (repart sur une nouvelle quête vierge) */
+  function _clearPermanentQuestForm() {
+    _permanentQuestEditingId = null;
+    _permanentQuestDraftTiers = [];
+    switchTab('daily');
   }
 
   // ── Cycles de connexion quotidienne ──
@@ -4959,7 +5124,7 @@ const WBAdminPanel = (() => {
       </select>`;
 
     const QUEST_TYPE_OPTIONS = `
-      <option value="event_defeat">⚔️ Éliminer des rivales [Tag]</option>
+      <option value="event_defeat">⚔️ Éliminer des créatures [Tag]</option>
       <option value="event_capture">🐾 Apprivoiser des créatures [Tag]</option>
       <option value="event_win_caprice">🌟 Réussir des Battues Sauvages</option>
       <option value="event_win_tag">✨ Réussir des combats [Tag]</option>
@@ -6926,6 +7091,8 @@ const WBAdminPanel = (() => {
     _updateRewardRefVisibility,
     _saveCycle, _editCycle, _toggleCycle, _deleteCycle, _clearCycleForm, _rebuildCycleDayRows, _toggleSecondReward,
     _saveWeeklyQuest, _editWeeklyQuest, _toggleWeeklyQuest, _deleteWeeklyQuest, _clearWeeklyQuestForm,
+    _savePermanentQuest, _editPermanentQuest, _deletePermanentQuest, _clearPermanentQuestForm,
+    _addPermanentQuestTierRow, _removePermanentQuestTierRow,
     _setDailySubTab,
     _saveEventTemplate, _resetEventTemplate, _addEventTplQuest, _deleteEventTplQuest,
     _saveCurrentTag, _saveNextTag, _onTplDayTypeChange, _forceStartEvent, _stopEvent,

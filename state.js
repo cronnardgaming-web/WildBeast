@@ -87,6 +87,7 @@ const WBGameState = (() => {
       shopListings: JSON.parse(JSON.stringify(WBGameDatabase.DEFAULT_SHOP_LISTINGS)),
       dailyLoginCycles: JSON.parse(JSON.stringify(WBGameDatabase.DEFAULT_DAILY_LOGIN_CYCLES)),
       dailyQuests:      JSON.parse(JSON.stringify(WBGameDatabase.DEFAULT_DAILY_QUESTS)),
+      permanentQuests:  JSON.parse(JSON.stringify(WBGameDatabase.DEFAULT_PERMANENT_QUESTS)),
       equipBanners: JSON.parse(JSON.stringify(WBGameDatabase.DEFAULT_EQUIP_BANNERS)),
       banners:      JSON.parse(JSON.stringify(WBGameDatabase.DEFAULT_BANNERS)),
       player:       JSON.parse(JSON.stringify(WBGameDatabase.DEFAULT_PLAYER)),
@@ -142,6 +143,7 @@ const WBGameState = (() => {
       shopListings: saved.shopListings || defaults.shopListings,
       dailyLoginCycles: saved.dailyLoginCycles || defaults.dailyLoginCycles,
       dailyQuests:      _mergeDailyQuests(defaults.dailyQuests, saved.dailyQuests),
+      permanentQuests:  saved.permanentQuests || defaults.permanentQuests,
       equipBanners: saved.equipBanners || defaults.equipBanners,
       banners:      saved.banners      || defaults.banners,
       player:       _mergePlayer(defaults.player, saved.player),
@@ -1136,10 +1138,9 @@ const WBGameState = (() => {
   // @param {string[]} [excludeKeys] - clés à ignorer (utilisé en interne pour
   //        éviter une référence circulaire : le calcul du score Aura d'un
   //        personnage a besoin du bonus joueur, mais SANS le bonus Aura lui-même).
-  function getPlayerStatBonus(excludeKeys = []) {
-    const stats  = _state.player.stats || {};
-    const cfg    = _state.config?.playerBonus || WBGameDatabase.DEFAULT_CONFIG.playerBonus;
-
+  /** Valeurs de stats "en direct" pour un joueur (compteurs cumulés + scores recalculés) */
+  function _getLiveStatMapping(excludeKeys = []) {
+    const stats = _state.player.stats || {};
     const mapping = {
       battles:    stats.totalBattles     || 0,
       victories:  stats.totalVictories   || 0,
@@ -1151,11 +1152,17 @@ const WBGameState = (() => {
       tourneeProgress: getTourneeProgress(),
       galleryEntries:  Object.keys(_state.player.catalogue || {}).length,
       trophyBestScore: _state.player.trophy?.bestScore || 0,
+      collectionSize:  (_state.player.collection || []).length,
+      playerLevel:     _state.player.level || 1,
     };
-    // Score Aura : ce ne sont PAS des compteurs stockés mais des valeurs
-    // recalculées en direct à partir de toute la collection (cf. plus bas).
     if (!excludeKeys.includes('scoreTotal')) mapping.scoreTotal = getPlayerAuraScoreTotal();
     if (!excludeKeys.includes('scoreTeam'))  mapping.scoreTeam  = getPlayerAuraScoreTeam();
+    return mapping;
+  }
+
+  function getPlayerStatBonus(excludeKeys = []) {
+    const cfg = _state.config?.playerBonus || WBGameDatabase.DEFAULT_CONFIG.playerBonus;
+    const mapping = _getLiveStatMapping(excludeKeys);
 
     let total = 0;
     const detail = [];
@@ -1167,6 +1174,66 @@ const WBGameState = (() => {
       detail.push({ key, label: rule.label, count, every: rule.every, points });
     });
     return { bonus: total, detail };
+  }
+
+  /**
+   * Valeur actuelle d'une statistique "en direct" pour les quêtes Permanentes
+   * (mêmes clés que le bonus de stats : battles, victories, kills, captures,
+   * pulls, evolutions, awakenings, tourneeProgress, galleryEntries,
+   * trophyBestScore, collectionSize, playerLevel, scoreTotal, scoreTeam).
+   */
+  function getLiveStatValue(statKey) {
+    return _getLiveStatMapping()[statKey] || 0;
+  }
+
+  /** Ajoute une nouvelle quête Permanente (avec ses paliers déjà fournis) */
+  function addPermanentQuest(data) {
+    _state.permanentQuests = [...(_state.permanentQuests || []), data];
+    _notify('permanentQuestAdded');
+    _autoSave();
+  }
+
+  /** Met à jour une quête Permanente existante (nom, statKey, ou liste complète de paliers) */
+  function updatePermanentQuest(id, data) {
+    const idx = (_state.permanentQuests || []).findIndex(q => q.id === id);
+    if (idx === -1) return false;
+    _state.permanentQuests[idx] = { ..._state.permanentQuests[idx], ...data };
+    _notify('permanentQuestChanged');
+    _autoSave();
+    return true;
+  }
+
+  /** Supprime une quête Permanente */
+  function removePermanentQuest(id) {
+    _state.permanentQuests = (_state.permanentQuests || []).filter(q => q.id !== id);
+    _notify('permanentQuestRemoved');
+    _autoSave();
+  }
+
+  /**
+   * Réclame manuellement le palier d'une quête Permanente déjà atteint
+   * (valeur en direct du joueur >= seuil du palier) et pas encore réclamé.
+   * @param {string} questId
+   * @param {string} tierId
+   */
+  function claimPermanentQuestTier(questId, tierId) {
+    const quest = (_state.permanentQuests || []).find(q => q.id === questId);
+    if (!quest) return { success: false, reason: 'quest_not_found' };
+    const tier = (quest.tiers || []).find(t => t.id === tierId);
+    if (!tier) return { success: false, reason: 'tier_not_found' };
+
+    const liveValue = getLiveStatValue(quest.statKey);
+    if (liveValue < tier.threshold) return { success: false, reason: 'threshold_not_reached' };
+
+    _state.player.permanentQuestsClaimed = _state.player.permanentQuestsClaimed || [];
+    if (_state.player.permanentQuestsClaimed.includes(tierId)) return { success: false, reason: 'already_claimed' };
+
+    _state.player.permanentQuestsClaimed = [..._state.player.permanentQuestsClaimed, tierId];
+    _grantReward(tier.reward);
+
+    _notify('permanentQuestTierClaimed', { questId, tierId, tier });
+    _autoSave();
+    return { success: true };
   }
 
   // ─── SCORE DE PUISSANCE "AURA" ────────────────────────────────────────────────
@@ -1648,7 +1715,7 @@ const WBGameState = (() => {
     const monday = _mondayString();
     if (wq.weekStart === monday) return; // déjà tiré cette semaine
 
-    const pool = WBGameDatabase.DEFAULT_WEEKLY_QUESTS || [];
+    const pool = _state.weeklyQuests?.length ? _state.weeklyQuests : (WBGameDatabase.DEFAULT_WEEKLY_QUESTS || []);
     const shuffled = [...pool].sort(() => Math.random() - 0.5);
     const picked = shuffled.slice(0, Math.min(5, shuffled.length));
 
@@ -1672,7 +1739,7 @@ const WBGameState = (() => {
     if (!wq || !wq.activeQuestIds?.includes(questId)) return { success: false, reason: 'not_active' };
     if (wq.claimed[questId]) return { success: false, reason: 'already_claimed' };
 
-    const questDef = (WBGameDatabase.DEFAULT_WEEKLY_QUESTS || []).find(q => q.id === questId);
+    const questDef = (_state.weeklyQuests?.length ? _state.weeklyQuests : (WBGameDatabase.DEFAULT_WEEKLY_QUESTS || [])).find(q => q.id === questId);
     if (!questDef) return { success: false, reason: 'unknown_quest' };
     if ((wq.progress[questId] || 0) < questDef.target) return { success: false, reason: 'not_complete' };
 
@@ -1709,9 +1776,10 @@ const WBGameState = (() => {
 
     // ── Quêtes hebdomadaires ──
     const wq = _state.player.weeklyQuestState;
-    if (wq?.activeQuestIds?.length && WBGameDatabase.DEFAULT_WEEKLY_QUESTS) {
+    const weeklyPool = _state.weeklyQuests?.length ? _state.weeklyQuests : (WBGameDatabase.DEFAULT_WEEKLY_QUESTS || []);
+    if (wq?.activeQuestIds?.length && weeklyPool.length) {
       wq.activeQuestIds.forEach(qid => {
-        const questDef = WBGameDatabase.DEFAULT_WEEKLY_QUESTS.find(q => q.id === qid);
+        const questDef = weeklyPool.find(q => q.id === qid);
         if (!questDef || questDef.type !== type) return;
         if (wq.claimed[qid]) return;
         const prev = wq.progress[qid] || 0;
@@ -1965,6 +2033,7 @@ const WBGameState = (() => {
     getStoryChapterProgress, completeStoryStage, isFeatureUnlocked,
     addDailyLoginCycle, updateDailyLoginCycle, removeDailyLoginCycle, getDailyLoginClaimable, claimDailyLoginReward,
     registerTrophyScore, claimTrophyRewardTier,
+    getLiveStatValue, addPermanentQuest, updatePermanentQuest, removePermanentQuest, claimPermanentQuestTier,
     addDailyQuest, updateDailyQuest, removeDailyQuest, checkDailyQuests, trackQuestProgress, claimDailyQuest,
     checkWeeklyQuests, claimWeeklyQuest,
     updateBanners, updatePlayer,

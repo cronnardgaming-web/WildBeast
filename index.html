@@ -3439,6 +3439,33 @@
   }
   .btn-quest-claim:disabled{ opacity:1; cursor:not-allowed; background:var(--surface-3); color:var(--text-faint); }
 
+  /* ── Quêtes Permanentes (paliers progressifs, jamais de reset) ────────── */
+  .perm-quests-list{ display:flex; flex-direction:column; gap:10px; }
+  .perm-quest-card{
+    background:var(--surface); border:1.5px solid var(--border-soft);
+    border-radius:var(--radius); padding:12px 14px;
+  }
+  .perm-quest-header{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+  .perm-quest-name{ font-weight:800; font-size:.85rem; }
+  .perm-quest-value{ font-family:var(--font-mono); font-size:.8rem; color:var(--accent); font-weight:700; }
+  .perm-quest-tiers{ display:flex; flex-direction:column; gap:6px; }
+  .perm-quest-tier{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    background:var(--surface-2); border:1px solid var(--border-soft);
+    border-radius:var(--radius-sm); padding:6px 10px;
+  }
+  .perm-quest-tier.perm-tier-claimed{ border-color:var(--success); opacity:.6; }
+  .perm-quest-tier.perm-tier-claimable{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .perm-quest-tier.perm-tier-locked{ opacity:.5; }
+  .perm-tier-threshold{ font-family:var(--font-mono); font-weight:700; font-size:.76rem; min-width:44px; }
+  .perm-tier-reward{ font-size:.72rem; color:var(--text-dim); flex:1; text-align:center; }
+  .perm-tier-status{ font-size:.85rem; }
+  .btn-perm-quest-claim{
+    background:var(--accent); color:#3B2000; border:none; border-radius:999px;
+    padding:5px 12px; font-weight:800; font-size:.7rem; cursor:pointer; white-space:nowrap;
+  }
+  .btn-perm-quest-claim:hover{ filter:brightness(1.1); }
+
   /* Popup de réclamation de connexion quotidienne */
   .daily-login-popup{ max-width:380px; }
   .login-cycle-days-popup{ margin:12px 0 16px; flex-wrap:wrap; justify-content:center; }

@@ -5944,7 +5944,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         const complete = progress >= q.target;
         const pct      = Math.min(100, Math.round((progress / q.target) * 100));
         const typeLabel = {
-          event_defeat:       `⚔️ Éliminer ${q.target} rivales ${tag?.name || 'Event'}`,
+          event_defeat:       `⚔️ Éliminer ${q.target} créatures ${tag?.name || 'Event'}`,
           event_capture:      `🐾 Apprivoiser ${q.target} créatures ${tag?.name || 'Event'}`,
           event_win_caprice:  `🌟 Réussir ${q.target} Battue Sauvage`,
           event_win_tag:      `✨ Réussir ${q.target} combats ${tag?.name || 'Event'}`,
@@ -6067,16 +6067,79 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         }).join('')}
       </div>` : '';
 
+    // ── Quêtes hebdomadaires ──────────────────────────────────────────────
+    WBGameState.checkWeeklyQuests?.();
+    const wqState = player.weeklyQuestState || { activeQuestIds: [], progress: {}, claimed: {} };
+    const weeklyPool = state.weeklyQuests?.length ? state.weeklyQuests : [];
+    const weeklyCards = (wqState.activeQuestIds || []).map(qid => {
+      const questDef = weeklyPool.find(q => q.id === qid);
+      if (!questDef) return '';
+      const progress = wqState.progress?.[qid] || 0;
+      const claimed  = !!wqState.claimed?.[qid];
+      const complete = progress >= questDef.target;
+      const pct      = Math.min(100, Math.round((progress / questDef.target) * 100));
+      return `
+        <div class="quest-card ${claimed ? 'quest-claimed' : complete ? 'quest-complete' : ''}">
+          <div class="quest-card-name">${questDef.name}</div>
+          <div class="quest-progress-bar-wrap">
+            <div class="quest-progress-bar-fill" style="width:${pct}%"></div>
+          </div>
+          <div class="quest-progress-label">${progress} / ${questDef.target}</div>
+          <div class="quest-reward-label">🎁 ${_formatRewardLabel(questDef.reward, state)}</div>
+          <button class="btn-quest-claim btn-weekly-claim" data-weekly-quest-id="${qid}" ${(!complete || claimed) ? 'disabled' : ''}>
+            ${claimed ? '✓ Réclamée' : complete ? 'Réclamer' : 'En cours...'}
+          </button>
+        </div>`;
+    }).join('');
+
+    // ── Quêtes Permanentes (jamais de reset, paliers progressifs) ─────────
+    const claimedTierIds = new Set(player.permanentQuestsClaimed || []);
+    const permanentCards = (state.permanentQuests || []).map(pq => {
+      const liveValue = WBGameState.getLiveStatValue(pq.statKey);
+      const tiersHtml = (pq.tiers || []).map(t => {
+        const claimed   = claimedTierIds.has(t.id);
+        const reachable = liveValue >= t.threshold;
+        return `
+          <div class="perm-quest-tier ${claimed ? 'perm-tier-claimed' : reachable ? 'perm-tier-claimable' : 'perm-tier-locked'}">
+            <span class="perm-tier-threshold">${t.threshold.toLocaleString('fr-FR')}</span>
+            <span class="perm-tier-reward">${_formatRewardLabel(t.reward, state)}</span>
+            ${claimed
+              ? '<span class="perm-tier-status">✓</span>'
+              : reachable
+                ? `<button class="btn-perm-quest-claim" data-perm-quest-id="${pq.id}" data-perm-tier-id="${t.id}">Réclamer</button>`
+                : '<span class="perm-tier-status">🔒</span>'}
+          </div>`;
+      }).join('');
+      return `
+        <div class="perm-quest-card">
+          <div class="perm-quest-header">
+            <span class="perm-quest-name">${pq.name}</span>
+            <span class="perm-quest-value">${liveValue.toLocaleString('fr-FR')}</span>
+          </div>
+          <div class="perm-quest-tiers">${tiersHtml}</div>
+        </div>`;
+    }).join('');
+
     el.innerHTML = `
       <div class="screen-header"><h2>🧭 Missions</h2>${_helpBtn('quests')}</div>
       ${eventBlockHtml}
       ${cyclesHtml}
       <div class="equip-section-title" style="margin-top:${ev||activeCycles.length?'16px':'0'}">📅 Rendez-vous du jour</div>
       <div class="quest-cards-list">${questCards || '<p class="empty-msg">Aucun rendez-vous aujourd\'hui.</p>'}</div>
+      <div class="equip-section-title" style="margin-top:16px">📆 Rendez-vous de la semaine</div>
+      <div class="quest-cards-list">${weeklyCards || '<p class="empty-msg">Aucun rendez-vous cette semaine.</p>'}</div>
+      <div class="equip-section-title" style="margin-top:16px">🏆 Progression Permanente</div>
+      <div class="perm-quests-list">${permanentCards || '<p class="empty-msg">Rien à afficher pour le moment.</p>'}</div>
     `;
 
     el.querySelectorAll('.btn-quest-claim:not(:disabled)').forEach(btn => {
       btn.addEventListener('click', () => _claimQuest(btn.dataset.questId));
+    });
+    el.querySelectorAll('.btn-weekly-claim:not(:disabled)').forEach(btn => {
+      btn.addEventListener('click', () => _claimWeeklyQuest(btn.dataset.weeklyQuestId));
+    });
+    el.querySelectorAll('.btn-perm-quest-claim').forEach(btn => {
+      btn.addEventListener('click', () => _claimPermanentQuestTier(btn.dataset.permQuestId, btn.dataset.permTierId));
     });
     el.querySelectorAll('.btn-event-claim:not(:disabled)').forEach(btn => {
       btn.addEventListener('click', () => _claimEventQuest(parseInt(btn.dataset.eventQuestIndex)));
@@ -6084,6 +6147,30 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     el.querySelectorAll('.btn-claim-daily-inline').forEach(btn => {
       btn.addEventListener('click', () => _claimDailyLoginInline(btn.dataset.cycleId));
     });
+  }
+
+  /** Réclame une quête hebdomadaire complétée */
+  function _claimWeeklyQuest(questId) {
+    const res = WBGameState.claimWeeklyQuest(questId);
+    if (res.success) {
+      _showToast('🎁 Récompense hebdomadaire réclamée !', 'success');
+      _updateHUD();
+      renderQuests();
+    } else {
+      _showToast('❌ Impossible de réclamer cette quête.', 'error');
+    }
+  }
+
+  /** Réclame un palier de quête Permanente */
+  function _claimPermanentQuestTier(questId, tierId) {
+    const res = WBGameState.claimPermanentQuestTier(questId, tierId);
+    if (res.success) {
+      _showToast('🎁 Palier réclamé !', 'success');
+      _updateHUD();
+      renderQuests();
+    } else {
+      _showToast('❌ Impossible de réclamer ce palier.', 'error');
+    }
   }
 
   function _claimEventQuest(index) {
