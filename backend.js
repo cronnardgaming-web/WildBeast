@@ -19,8 +19,8 @@ const WBBackend = (() => {
   // mêmes comptes joueurs. Crée un nouveau projet sur supabase.com, exécute
   // le script SQL de mise en place des tables (identique à ChronoWaifu, à
   // rejouer sur ce nouveau projet), puis colle ici son URL et sa clé publique.
-  const SUPABASE_URL = 'https://VOTRE-PROJET-WILDBEAST.supabase.co'; // TODO
-  const SUPABASE_KEY = 'VOTRE_CLE_PUBLIQUE_WILDBEAST';                // TODO
+  const SUPABASE_URL = 'https://dvssuwhgcxpjdbkqllnt.supabase.co'; // TODO
+  const SUPABASE_KEY = 'sb_publishable_lgqyY4rrTMefClxYclHfpQ_uCX-grLg';                // TODO
 
   let _client = null;
   let _currentUserId = null;
