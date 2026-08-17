@@ -5519,9 +5519,11 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   /** Tire une rareté selon les dropRates de la bannière */
   function _rollEquipRarity(banner) {
     const rates = banner.dropRates || {};
-    const roll  = Math.random() * 100;
-    let cum     = 0;
-    const order = ['legendary', 'epic', 'rare', 'uncommon', 'common'];
+    const order = ['mythic', 'legendary', 'epic', 'rare', 'uncommon', 'common'];
+    const total = order.reduce((s, r) => s + (rates[r] || 0), 0);
+    if (total <= 0) return 'common';
+    const roll = Math.random() * total;
+    let cum = 0;
     for (const r of order) {
       cum += (rates[r] || 0);
       if (roll < cum) return r;

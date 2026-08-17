@@ -167,7 +167,7 @@ const WBGameDatabase = (() => {
       dropRates: {
         common:    50,
         uncommon:  30,
-        rare:      12,
+        rare:      12.5,
         epic:       5,
         legendary:  2,
         mythic:     0.5,
@@ -948,11 +948,12 @@ const WBGameDatabase = (() => {
       guaranteedRareAfter: 10,
       guaranteedEpicAfter: 30,
       dropRates: {
-        common:    45,
+        common:    50,
         uncommon:  30,
-        rare:      16,
-        epic:       7,
+        rare:      12.5,
+        epic:       5,
         legendary:  2,
+        mythic:     0.5,
       },
     },
   ];
