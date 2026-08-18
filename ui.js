@@ -955,6 +955,7 @@ const WBGameUI = (() => {
       'duel-defense-team': renderDuelDefenseTeam,
       'duel-rewards':      renderDuelRewards,
       'duel-shop':         renderDuelShop,
+      'duel-live-queue':   renderDuelLiveQueue,
     };
     renderers[screenId]?.();
     _setNavActive(screenId);
@@ -2470,8 +2471,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       const stripEl = document.getElementById('duel-roulette-strip');
       const cardEl  = stripEl?.querySelector('.duel-roulette-card');
       const cardW   = (cardEl?.offsetWidth || 120) + 10; // + gap
-      const windowW = overlay.querySelector('.duel-roulette-window')?.offsetWidth || 320;
-      const targetX = (strip.length - 1) * cardW - (windowW / 2) + (cardW / 2);
+      const targetX = (strip.length - 1) * cardW + (cardW / 2);
       stripEl.style.transition = 'transform 3.2s cubic-bezier(.12,.72,.13,1)';
       stripEl.style.transform  = `translateX(-${targetX}px)`;
     });
@@ -2605,15 +2605,16 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
           <span class="trophy-hub-btn-label">Duel à Distance</span>
           <span class="trophy-hub-btn-desc">Affronte l'équipe de défense d'un autre joueur</span>
         </button>
-        <button class="trophy-hub-btn" id="btn-duel-live" style="opacity:.5;cursor:not-allowed">
+        <button class="trophy-hub-btn" id="btn-duel-live">
           <span class="trophy-hub-btn-icon">🔴</span>
           <span class="trophy-hub-btn-label">Duel en Direct</span>
-          <span class="trophy-hub-btn-desc">🔒 Bientôt disponible</span>
+          <span class="trophy-hub-btn-desc">Affronte un joueur connecté maintenant</span>
         </button>
       </div>
     `;
 
     document.getElementById('btn-duel-async')?.addEventListener('click', () => showScreen('duel-async'));
+    document.getElementById('btn-duel-live')?.addEventListener('click', () => showScreen('duel-live-queue'));
   }
 
   let _defenseTeamDraft = null; // null tant que l'écran n'a pas été ouvert au moins une fois
@@ -2839,6 +2840,321 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   }
 
   /** Écran du Comptoir du Duel — boutique dédiée, prix toujours en 🩸 Instinct Primaire */
+  // ─── DUEL EN DIRECT (PvP temps réel) ────────────────────────────────────────
+
+  let _liveQueuePolling   = null;
+  let _liveDuelId         = null;
+  let _liveDuelIsHost     = false;
+  let _liveDuelUnsubscribe = null;
+  let _liveDuelSuspendTimer = null;
+
+  /** Écran de recherche d'adversaire pour le Duel en Direct */
+  function renderDuelLiveQueue() {
+    const el = document.getElementById('screen-duel-live-queue');
+    if (!el) return;
+    el.innerHTML = `
+      <div class="screen-header"><h2>🔴 Duel en Direct</h2>${_helpBtn('duel')}</div>
+      <div class="trophy-hub-screen">
+        <div class="duel-live-searching">
+          <div class="duel-live-spinner"></div>
+          <div class="duel-live-searching-text">Recherche d'un adversaire connecté...</div>
+        </div>
+        <button class="trophy-hub-btn" id="btn-cancel-live-queue">
+          <span class="trophy-hub-btn-icon">✕</span>
+          <span class="trophy-hub-btn-label">Annuler la recherche</span>
+        </button>
+      </div>
+    `;
+    document.getElementById('btn-cancel-live-queue')?.addEventListener('click', () => {
+      _leaveLiveQueue();
+      showScreen('duel-hub');
+    });
+    _joinLiveQueue();
+  }
+
+  /** Rejoint la file d'attente et lance le sondage périodique d'un adversaire */
+  async function _joinLiveQueue() {
+    const state = WBGameState.get();
+    const userId = WBBackend.getCurrentUserId?.();
+    if (!userId) { _showToast('Connexion requise.', 'error'); showScreen('duel-hub'); return; }
+
+    const mySnapshot = _buildPvpSnapshotFromTeam(WBGameState.getTeam().map(i => i.instanceId));
+    if (mySnapshot.length === 0) { _showToast('Compose une équipe avant de duel.', 'error'); showScreen('duel-hub'); return; }
+
+    const myElo = state.player.pvp?.elo ?? 1000;
+    const myName = state.player.name || 'Ranger';
+    await WBBackend.joinPvpLiveQueue(userId, myName, myElo, mySnapshot);
+
+    _liveQueuePolling = setInterval(async () => {
+      // La comparaison lexicographique des UUID désigne SANS ambiguïté qui des
+      // deux crée le salon (évite toute course si les deux joueurs pollent
+      // en même temps) — l'autre se contente d'attendre d'y être rattaché.
+      const opponent = await WBBackend.findPvpLiveOpponent(userId);
+      if (!opponent) return;
+
+      clearInterval(_liveQueuePolling);
+      _liveQueuePolling = null;
+
+      if (userId < opponent.user_id) {
+        // Je crée le salon et deviens hôte
+        const duel = await WBBackend.createPvpLiveDuel({
+          player1_id: userId, player2_id: opponent.user_id,
+          player1_name: myName, player2_name: opponent.display_name || 'Ranger',
+          host_id: userId, status: 'active',
+          battle_state: {}, // rempli juste après par _startLiveDuelAsHost
+        });
+        await WBBackend.leavePvpLiveQueue(userId);
+        await WBBackend.leavePvpLiveQueue(opponent.user_id);
+        if (duel) _enterLiveDuel(duel.id, true, opponent);
+      } else {
+        // Je laisse l'autre créer le salon — j'attends qu'il apparaisse pour moi
+        _waitForLiveDuelAsGuest(userId, opponent);
+      }
+    }, 2000);
+  }
+
+  /** Sondage en attendant que l'hôte (l'autre joueur) crée le salon */
+  function _waitForLiveDuelAsGuest(userId, opponent) {
+    _liveQueuePolling = setInterval(async () => {
+      const duel = await WBBackend.findMyActivePvpLiveDuel(userId).catch(() => null);
+      if (!duel) return; // l'hôte n'a pas encore créé le salon, on repasse au prochain sondage
+      clearInterval(_liveQueuePolling);
+      _liveQueuePolling = null;
+      await WBBackend.leavePvpLiveQueue(userId);
+      _enterLiveDuel(duel.id, false, opponent);
+    }, 2000);
+  }
+
+  /** Quitte la file d'attente proprement */
+  function _leaveLiveQueue() {
+    if (_liveQueuePolling) { clearInterval(_liveQueuePolling); _liveQueuePolling = null; }
+    const userId = WBBackend.getCurrentUserId?.();
+    if (userId) WBBackend.leavePvpLiveQueue(userId);
+  }
+
+  let _liveDuelTimerInterval = null;
+  let _liveDuelTurnDeadline  = null;
+  let _liveDuelMySnapshot    = null; // conservé pour reconstruire le combat en cas de bascule d'hôte
+
+  /** Point d'entrée une fois un adversaire trouvé et le salon prêt */
+  async function _enterLiveDuel(duelId, isHost, opponent) {
+    _liveDuelId = duelId;
+    _liveDuelIsHost = isHost;
+    showScreen('combat');
+
+    if (isHost) {
+      await _startLiveDuelAsHost(duelId, opponent);
+    } else {
+      _startLiveDuelAsGuest(duelId, opponent);
+    }
+  }
+
+  /** Côté hôte : fait tourner le VRAI moteur de combat, pousse l'état après chaque événement */
+  async function _startLiveDuelAsHost(duelId, opponent) {
+    const mySnapshot = _buildPvpSnapshotFromTeam(WBGameState.getTeam().map(i => i.instanceId));
+    _liveDuelMySnapshot = mySnapshot;
+    const enemySnapshot = opponent.team_snapshot || [];
+
+    _battle = WBCombatEngine.start(_onLiveDuelHostEvent, {
+      mode: 'pvp', isLiveDuel: true, playerSnapshot: mySnapshot, enemySnapshot,
+      pvpOpponent: { userId: opponent.user_id, name: opponent.display_name || 'Ranger', elo: opponent.elo || 1000 },
+    });
+    if (!_battle) return;
+
+    _combatInProgress = true;
+    document.body.classList.add('battle-active');
+    const lobby = document.querySelector('.combat-lobby');
+    const battleArea = document.getElementById('battle-area');
+    if (lobby) lobby.style.display = 'none';
+    if (battleArea) battleArea.style.display = 'block';
+    const tabsEl = document.querySelector('.combat-mode-tabs'); if (tabsEl) tabsEl.style.display = 'none';
+    const navEl  = document.getElementById('main-nav'); if (navEl) navEl.style.display = 'none';
+    WBAudioSystem.playCombat();
+    _renderBattle();
+
+    // S'abonne aux mises à jour du salon — sert surtout à recevoir le choix
+    // de cible envoyé par l'invité, et à détecter sa déconnexion.
+    _liveDuelUnsubscribe = WBBackend.subscribePvpLiveDuel(duelId, (row) => _onLiveDuelHostRowUpdate(row));
+
+    await WBBackend.updatePvpLiveDuel(duelId, { battle_state: _serializeLiveBattle(_battle) });
+  }
+
+  /** Gère les événements du moteur côté hôte : joue les animations normalement + pousse l'état au salon */
+  function _onLiveDuelHostEvent(event, data) {
+    _onBattleEvent(event, data); // réutilise 100% du rendu de combat déjà existant
+
+    if (event === 'awaitingRemoteAction') {
+      // C'est au tour de l'invité — on démarre le minuteur de 20s et on
+      // attend son choix (reçu via _onLiveDuelHostRowUpdate ci-dessous).
+      _startLiveDuelTurnTimer(20, (auto) => {
+        if (!_battle || _battle.phase !== 'enemy') return;
+        // Personne n'a choisi à temps : attaque automatique sur la meilleure cible
+        const targets = _battle.playerTeam.filter(p => p.alive);
+        const best = WBCombatEngine._aiChooseTarget(data.actor, targets);
+        if (best) WBCombatEngine.resolveRemoteAttack(data.actor.instanceId, best.instanceId);
+      });
+    }
+
+    if (['playerAttack', 'enemyAttack', 'roundStart', 'playerTurn'].includes(event) && _liveDuelId) {
+      WBBackend.updatePvpLiveDuel(_liveDuelId, { battle_state: _serializeLiveBattle(_battle) });
+    }
+
+    if (event === 'victory' || event === 'defeat') {
+      _stopLiveDuelTurnTimer();
+      WBBackend.updatePvpLiveDuel(_liveDuelId, { battle_state: _serializeLiveBattle(_battle), status: 'finished' });
+    }
+  }
+
+  /** Réagit aux mises à jour du salon reçues côté hôte (choix de l'invité, déconnexion) */
+  function _onLiveDuelHostRowUpdate(row) {
+    if (!_battle) return;
+    if (row.status === 'suspended') return; // géré ailleurs (détection de déconnexion)
+    const pending = row.battle_state?.pendingGuestAction;
+    if (pending && _battle.phase === 'enemy' && _battle.currentActor === pending.attackerId) {
+      _stopLiveDuelTurnTimer();
+      WBCombatEngine.resolveRemoteAttack(pending.attackerId, pending.targetId);
+    }
+  }
+
+  /** Sérialise le strict nécessaire de _battle pour le salon (évite d'envoyer des fonctions/objets circulaires) */
+  function _serializeLiveBattle(battle) {
+    return JSON.parse(JSON.stringify({
+      turn: battle.turn, phase: battle.phase, currentActor: battle.currentActor,
+      playerTeam: battle.playerTeam, enemyTeam: battle.enemyTeam,
+      turnOrder: battle.turnOrder, turnIndex: battle.turnIndex,
+      log: battle.log.slice(-20), result: battle.result,
+    }));
+  }
+
+  /** Minuteur de tour (20s), affiché des deux côtés — déclenche onExpire si personne n'agit à temps */
+  function _startLiveDuelTurnTimer(seconds, onExpire) {
+    _stopLiveDuelTurnTimer();
+    _liveDuelTurnDeadline = Date.now() + seconds * 1000;
+    _updateLiveDuelTimerDisplay();
+    _liveDuelTimerInterval = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((_liveDuelTurnDeadline - Date.now()) / 1000));
+      _updateLiveDuelTimerDisplay(remaining);
+      if (remaining <= 0) {
+        _stopLiveDuelTurnTimer();
+        onExpire?.(true);
+      }
+    }, 250);
+  }
+
+  function _stopLiveDuelTurnTimer() {
+    if (_liveDuelTimerInterval) { clearInterval(_liveDuelTimerInterval); _liveDuelTimerInterval = null; }
+    _liveDuelTurnDeadline = null;
+    _updateLiveDuelTimerDisplay();
+  }
+
+  function _updateLiveDuelTimerDisplay(remaining) {
+    const el = document.getElementById('duel-live-timer');
+    if (!el) return;
+    if (remaining == null) { el.style.display = 'none'; return; }
+    el.style.display = 'flex';
+    el.textContent = `⏱️ ${remaining}s`;
+    el.classList.toggle('duel-live-timer-urgent', remaining <= 5);
+  }
+
+  /** Côté invité : ne fait PAS tourner le moteur — reçoit l'état de l'hôte et affiche une vue simplifiée */
+  function _startLiveDuelAsGuest(duelId, opponent) {
+    showScreen('combat');
+    _combatInProgress = true;
+    document.body.classList.add('battle-active');
+    const navEl = document.getElementById('main-nav'); if (navEl) navEl.style.display = 'none';
+    WBAudioSystem.playCombat();
+    _renderLiveDuelGuestShell(opponent);
+
+    _liveDuelUnsubscribe = WBBackend.subscribePvpLiveDuel(duelId, (row) => _onLiveDuelGuestRowUpdate(row, opponent));
+    // Récupère l'état déjà présent (au cas où l'hôte l'a déjà poussé avant l'abonnement)
+    WBBackend.loadPvpLiveDuel(duelId).then(row => { if (row) _onLiveDuelGuestRowUpdate(row, opponent); });
+  }
+
+  /** Construit la coquille d'écran de combat côté invité (vue simplifiée, sans les animations complètes de l'hôte) */
+  function _renderLiveDuelGuestShell(opponent) {
+    const area = document.getElementById('battle-area');
+    if (!area) return;
+    area.style.display = 'block';
+    area.innerHTML = `
+      <div class="duel-live-timer" id="duel-live-timer" style="display:none"></div>
+      <div class="battle-scene">
+        <div class="battle-side battle-enemy">
+          <h3>${_truncateName(opponent.display_name || 'Adversaire')}</h3>
+          <div class="battle-fighters" id="guest-enemy-fighters"></div>
+        </div>
+        <div class="battle-vs">⚔</div>
+        <div class="battle-side battle-player">
+          <h3>${_truncateName(WBGameState.getPlayer().name || 'Toi')}</h3>
+          <div class="battle-fighters" id="guest-player-fighters"></div>
+        </div>
+      </div>
+      <div class="battle-log" id="guest-battle-log"></div>
+      <div class="battle-controls" id="guest-battle-actions"></div>
+    `;
+  }
+
+  /** Reçoit une mise à jour du salon côté invité : ré-affiche l'état, propose de choisir si c'est son tour */
+  function _onLiveDuelGuestRowUpdate(row, opponent) {
+    if (!row) return;
+
+    if (row.status === 'finished') {
+      _stopLiveDuelTurnTimer();
+      const remote = row.battle_state || {};
+      // Du point de vue de l'invité, son équipe est "enemyTeam" dans l'état de l'hôte —
+      // il a gagné si le résultat final de l'hôte est 'defeat'.
+      const guestWon = remote.result === 'defeat';
+      _showDuelResult({ rewards: { didWin: guestWon, ...WBGameState.registerPvpResult(guestWon, opponent.display_name || 'Ranger', opponent.elo || 1000) } });
+      return;
+    }
+
+    const remote = row.battle_state;
+    if (!remote) return;
+
+    // On inverse l'affichage : MON équipe (enemyTeam côté hôte) apparaît en bas, comme d'habitude
+    const myFighters  = remote.enemyTeam || [];
+    const oppFighters = remote.playerTeam || [];
+    const enemyGrid = document.getElementById('guest-enemy-fighters');
+    const playerGrid = document.getElementById('guest-player-fighters');
+    if (enemyGrid)  enemyGrid.innerHTML  = oppFighters.map((c, i) => _renderFighter(c, i)).join('');
+    if (playerGrid) playerGrid.innerHTML = myFighters.map((c, i) => _renderFighter(c, i)).join('');
+
+    const logEl = document.getElementById('guest-battle-log');
+    if (logEl) logEl.innerHTML = (remote.log || []).slice(-8).map(l => `<div class="log-line">${l}</div>`).join('');
+
+    const actionsEl = document.getElementById('guest-battle-actions');
+    const myTurn = remote.phase === 'enemy' && myFighters.some(c => c.instanceId === remote.currentActor);
+    if (myTurn && actionsEl) {
+      const attacker = myFighters.find(c => c.instanceId === remote.currentActor);
+      actionsEl.innerHTML = `
+        <p style="text-align:center;font-size:.8rem;margin-bottom:8px">À toi de jouer avec <strong>${attacker?.name || ''}</strong> !</p>
+        <div class="battle-target-row">
+          ${oppFighters.filter(c => c.alive).map(c => `<button class="btn-target" data-target-id="${c.instanceId}">${c.name}</button>`).join('')}
+        </div>
+      `;
+      actionsEl.querySelectorAll('.btn-target').forEach(btn => {
+        btn.addEventListener('click', () => _submitGuestAction(remote.currentActor, btn.dataset.targetId));
+      });
+      _startLiveDuelTurnTimer(20, () => {
+        // Temps écoulé côté invité : choisit automatiquement une cible (meilleure disponible)
+        const alive = oppFighters.filter(c => c.alive);
+        if (alive.length > 0) _submitGuestAction(remote.currentActor, alive[0].instanceId);
+      });
+    } else if (actionsEl) {
+      actionsEl.innerHTML = `<p style="text-align:center;font-size:.8rem;color:var(--text-dim)">En attente de l'adversaire...</p>`;
+      _stopLiveDuelTurnTimer();
+    }
+  }
+
+  /** Envoie le choix de cible de l'invité vers le salon, pour que l'hôte le résolve */
+  async function _submitGuestAction(attackerId, targetId) {
+    _stopLiveDuelTurnTimer();
+    if (!_liveDuelId) return;
+    const row = await WBBackend.loadPvpLiveDuel(_liveDuelId);
+    if (!row) return;
+    const newState = { ...(row.battle_state || {}), pendingGuestAction: { attackerId, targetId, at: Date.now() } };
+    await WBBackend.updatePvpLiveDuel(_liveDuelId, { battle_state: newState });
+  }
+
   function renderDuelShop() {
     const el = document.getElementById('screen-duel-shop');
     if (!el) return;
@@ -3377,6 +3693,12 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     if (roundEl) roundEl.textContent = _battle.turn;
   }
 
+  /** Tronque un nom de joueur à 15 caractères (affichage des en-têtes de combat PvP) */
+  function _truncateName(name) {
+    if (!name) return '';
+    return name.length > 15 ? name.slice(0, 15) + '…' : name;
+  }
+
   function _renderBattle() {
     const area = document.getElementById('battle-area');
     if (!area || !_battle) return;
@@ -3389,16 +3711,17 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
           <span class="trophy-hud-score">🎯 Score : <strong id="trophy-hud-score-value">${(b.trophyScore || 0).toLocaleString('fr-FR')}</strong></span>
           <span class="trophy-hud-rounds">Tour <strong id="trophy-hud-round-value">${b.turn}</strong> / ${trophyCfg.rounds || 15}</span>
         </div>` : ''}
+      ${b.isLiveDuel ? `<div class="duel-live-timer" id="duel-live-timer" style="display:none"></div>` : ''}
       <div class="battle-scene">
         <div class="battle-side battle-enemy">
-          <h3>Ennemis</h3>
+          <h3>${b.mode === 'pvp' ? _truncateName(b.pvpOpponent?.name || 'Adversaire') : 'Ennemis'}</h3>
           <div class="battle-fighters" id="enemy-fighters">
             ${b.enemyTeam.map((e, i) => _renderFighter(e, i)).join('')}
           </div>
         </div>
         <div class="battle-vs">⚔</div>
         <div class="battle-side battle-player">
-          <h3>Votre équipe</h3>
+          <h3>${b.mode === 'pvp' ? _truncateName(WBGameState.getPlayer().name || 'Toi') : 'Votre équipe'}</h3>
           <div class="battle-fighters" id="player-fighters">
             ${b.playerTeam.map((p, i) => _renderFighter(p, i)).join('')}
           </div>
