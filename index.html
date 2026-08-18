@@ -3466,6 +3466,52 @@
   }
   .btn-perm-quest-claim:hover{ filter:brightness(1.1); }
 
+  /* ── Duel à Distance (PvP asynchrone) ──────────────────────────────────── */
+  .duel-history-list{ display:flex; flex-direction:column; gap:6px; }
+  .duel-history-row{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--surface); border:1px solid var(--border-soft);
+    border-radius:var(--radius-sm); padding:8px 12px; font-size:.78rem;
+  }
+  .duel-history-row.duel-history-won{ border-left:3px solid var(--success); }
+  .duel-history-row.duel-history-lost{ border-left:3px solid var(--danger); }
+
+  /* Animation de roulette d'adversaire */
+  #duel-roulette-overlay{
+    position:absolute; inset:0; z-index:9000;
+    background:#09040f;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:24px; opacity:1; transition:opacity 400ms ease;
+  }
+  .duel-roulette-title{ font-family:var(--font-display); font-size:1.05rem; font-weight:800; color:#F5EAD3; }
+  .duel-roulette-window{
+    position:relative; width:100%; max-width:340px; height:130px;
+    overflow:hidden; border-radius:var(--radius-lg);
+    background:linear-gradient(180deg, rgba(255,255,255,.04), transparent);
+    border:2px solid var(--accent);
+    transition:box-shadow .3s ease;
+  }
+  .duel-roulette-window.duel-roulette-landed{ box-shadow:0 0 0 4px var(--accent), 0 0 30px var(--gold-glow); }
+  .duel-roulette-strip{
+    position:absolute; top:0; left:50%; height:100%;
+    display:flex; align-items:center; gap:10px;
+    will-change:transform;
+  }
+  .duel-roulette-card{
+    flex:0 0 110px; height:100px;
+    background:var(--surface); border:1.5px solid var(--border-soft);
+    border-radius:var(--radius); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:4px;
+  }
+  .duel-roulette-avatar{ font-size:1.8rem; }
+  .duel-roulette-name{ font-size:.7rem; font-weight:700; color:#F5EAD3; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .duel-roulette-elo{ font-size:.62rem; color:var(--accent); font-family:var(--font-mono); }
+  .duel-roulette-marker{
+    position:absolute; left:50%; top:-6px; bottom:-6px; width:2px;
+    background:var(--accent); transform:translateX(-50%);
+    box-shadow:0 0 8px var(--accent);
+  }
+
   /* Popup de réclamation de connexion quotidienne */
   .daily-login-popup{ max-width:380px; }
   .login-cycle-days-popup{ margin:12px 0 16px; flex-wrap:wrap; justify-content:center; }
@@ -3634,6 +3680,11 @@
       <section id="screen-combat" class="screen"></section>
       <section id="screen-trophy-hub" class="screen"></section>
       <section id="screen-trophy-rewards" class="screen"></section>
+      <section id="screen-duel-hub" class="screen"></section>
+      <section id="screen-duel-async" class="screen"></section>
+      <section id="screen-duel-defense-team" class="screen"></section>
+      <section id="screen-duel-rewards" class="screen"></section>
+      <section id="screen-duel-shop" class="screen"></section>
       <section id="screen-gacha" class="screen"></section>
       <section id="screen-equip" class="screen"></section>
       <section id="screen-inventory" class="screen"></section>
@@ -3646,6 +3697,7 @@
     <nav id="main-nav"></nav>
     <div id="plus-menu">
       <div class="plus-item" data-target="quests"><span class="pi">🧭</span>Missions</div>
+      <div class="plus-item" data-target="shop"><span class="pi">🛍️</span>Shop</div>
       <div class="plus-item" data-target="inventory"><span class="pi">🎒</span>Inventaire</div>
       <div class="plus-item" data-target="catalogue"><span class="pi">📚</span>Encyclopédie</div>
       <div class="plus-item" data-target="leaderboard"><span class="pi">🏆</span>Classements</div>

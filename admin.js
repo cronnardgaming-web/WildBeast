@@ -41,6 +41,7 @@ const WBAdminPanel = (() => {
     { id: 'attacks',    label: '💥 Passifs',      group: 'Mécanique'  },
     { id: 'combat',     label: '⚔️ Combat',       group: 'Mécanique'  },
     { id: 'trophy',     label: '🎯 Traque',       group: 'Mécanique'  },
+    { id: 'duel',       label: '🩸 Duel',         group: 'Mécanique'  },
     // ── Système ──────────────────────────────────────────────────────────────
     { id: 'player',     label: '🎮 Joueur',      group: 'Système'    },
     { id: 'resources',  label: '💧 Ressources',  group: 'Système'    },
@@ -672,6 +673,7 @@ const WBAdminPanel = (() => {
           case 'resources':  content.innerHTML = _renderResourcesTab();  break;
           case 'combat':     content.innerHTML = _renderCombatTab();     break;
           case 'trophy':     content.innerHTML = _renderTrophyTab();     break;
+          case 'duel':       content.innerHTML = _renderDuelTab();       break;
           case 'items':      content.innerHTML = _renderItemsTab();      break;
           case 'shop':       content.innerHTML = _renderShopTab();       break;
           case 'daily':      content.innerHTML = _renderDailyTab();      _rebuildCycleDayRows();      break;
@@ -2760,6 +2762,7 @@ const WBAdminPanel = (() => {
     trophyBestScore: '🎯 Meilleur score Traque',
     scoreTotal:      '⭐ Attrait total',
     scoreTeam:       '👑 Attrait d\'équipe',
+    pvpWins:         '⚔️ Victoires en Duel PvP',
   };
 
   function _renderPermanentQuestSection() {
@@ -5078,6 +5081,7 @@ const WBAdminPanel = (() => {
               tourneeProgress: WBGameState.getTourneeProgress?.() || 0,
               galleryEntries:  Object.keys(state.player.catalogue || {}).length,
               trophyBestScore: state.player.trophy?.bestScore || 0,
+              pvpWins: state.player.stats?.totalPvpWins || 0,
             }[key] || 0;
             const pts = Math.floor(statVal / rule.every);
             return `<div class="admin-field">
@@ -6755,6 +6759,181 @@ const WBAdminPanel = (() => {
 
   /** Ajoute un nouveau palier de récompense Trophée (score par défaut au-dessus du dernier palier existant) */
   /** Onglet dédié au mode Traque (score attack), à côté de l'onglet Combat */
+  function _renderDuelTab() {
+    const state = WBGameState.get();
+    const cfg   = state.config;
+    const pCfg  = cfg.combat?.pvp || {};
+    const editing = _pvpShopEditingId ? (state.pvpShopListings || []).find(l => l.id === _pvpShopEditingId) : null;
+
+    const listingsHtml = (state.pvpShopListings || []).map(l => {
+      const ref = l.kind === 'equipment' ? state.equipment.find(e => e.id === l.refId) : state.items.find(i => i.id === l.refId);
+      return `
+        <div class="admin-list-item">
+          <div class="admin-list-item-info">
+            <div class="admin-list-item-name">${ref?.name || l.refId}</div>
+            <div class="admin-list-item-sub">Prix : ${l.price} 🩸 | ${l.enabled === false ? 'Désactivé' : 'Actif'}</div>
+          </div>
+          <div class="admin-list-item-actions">
+            <button class="admin-btn admin-btn-primary admin-btn-sm" onclick="WBAdminPanel._editPvpShopListing('${l.id}')">✏️</button>
+            <button class="admin-btn admin-btn-danger admin-btn-sm" onclick="WBAdminPanel._deletePvpShopListing('${l.id}')">🗑️</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="admin-section">
+        <div class="admin-section-title">🩸 Duel à Distance (PvP asynchrone)</div>
+        <p style="font-size:.78rem;color:#888;margin:0 0 12px">
+          Combat contre l'équipe de défense publiée par un autre joueur, choisi au hasard. Niveau imposé à toutes les créatures pour ce combat uniquement. Aucun XP/Or/Essence Sauvage — uniquement Instinct Primaire et variation d'ELO.
+        </p>
+        <div class="admin-field-row">
+          <div class="admin-field"><label>Stamina max</label><input type="number" id="pvp-stamina-max" value="${pCfg.staminaMax ?? 10}" min="1"></div>
+          <div class="admin-field"><label>Régén. (minutes/point)</label><input type="number" id="pvp-stamina-regen" value="${pCfg.staminaRegenMinutes ?? 180}" min="1"></div>
+          <div class="admin-field"><label>Coût par duel</label><input type="number" id="pvp-stamina-cost" value="${pCfg.staminaCostPerDuel ?? 1}" min="1"></div>
+          <div class="admin-field"><label>Niveau imposé au combat</label><input type="number" id="pvp-combat-level" value="${pCfg.combatLevel ?? 50}" min="1" max="200"></div>
+        </div>
+        <div class="admin-field-row">
+          <div class="admin-field"><label>ELO de départ</label><input type="number" id="pvp-elo-starting" value="${pCfg.eloStarting ?? 1000}" min="0"></div>
+          <div class="admin-field"><label>Facteur K (sensibilité ELO)</label><input type="number" id="pvp-elo-k" value="${pCfg.eloKFactor ?? 24}" min="1"></div>
+          <div class="admin-field"><label>🩸 par victoire</label><input type="number" id="pvp-reward-per-win" value="${pCfg.rewardPerWin ?? 15}" min="0"></div>
+          <div class="admin-field"><label>Nom de la monnaie</label><input type="text" id="pvp-currency-name" value="${pCfg.currencyName || 'Instinct Primaire'}"></div>
+        </div>
+
+        <div class="admin-section-title" style="margin-top:16px;font-size:.85rem">🎁 Paliers de récompense (selon les victoires cumulées)</div>
+        <div id="pvp-tiers-rows">
+          ${(pCfg.rewardTiers || []).map((t, i) => `
+            <div class="cycle-day-row pvp-tier-row" data-tier-idx="${i}" data-tier-id="${t.id}" style="margin-bottom:8px;padding:8px;background:#1a1630;border-radius:6px">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="min-width:70px;font-weight:700;font-size:.8rem">Victoires ≥</span>
+                <input type="number" class="pvp-tier-wins" value="${t.wins}" min="0" style="width:90px">
+                ${_buildRewardEditorHtml(`pvp-tier-${i}`, t.reward)}
+                <button class="admin-btn admin-btn-danger admin-btn-sm" onclick="WBAdminPanel._removePvpTierRow(${i})">🗑️</button>
+              </div>
+            </div>`).join('')}
+        </div>
+        <button class="admin-btn admin-btn-secondary admin-btn-sm" onclick="WBAdminPanel._addPvpTierRow()">+ Palier</button>
+
+        <div class="admin-actions" style="margin-top:14px">
+          <button class="admin-btn admin-btn-success" onclick="WBAdminPanel._saveDuelConfig()">💾 Sauver la config Duel</button>
+        </div>
+      </div>
+
+      <hr class="admin-sep" />
+
+      <div class="admin-section">
+        <div class="admin-section-title">🛍️ Comptoir du Duel ${editing ? `— édition « ${editing ? (state.equipment.find(e=>e.id===editing.refId)?.name || state.items.find(i=>i.id===editing.refId)?.name) : ''} »` : '(nouvel article)'}</div>
+        <div class="admin-field-row">
+          <div class="admin-field"><label>Type</label>
+            <select id="pvpshop-kind">
+              <option value="equipment" ${editing?.kind === 'equipment' ? 'selected' : ''}>⚔️ Équipement</option>
+              <option value="item" ${editing?.kind === 'item' ? 'selected' : ''}>🎒 Objet</option>
+            </select>
+          </div>
+          <div class="admin-field"><label>Référence (ID)</label><input type="text" id="pvpshop-ref" value="${editing?.refId || ''}" placeholder="ex: ArmureC"></div>
+          <div class="admin-field"><label>Prix 🩸</label><input type="number" id="pvpshop-price" value="${editing?.price ?? 100}" min="1"></div>
+          <div class="admin-field"><label>Disponible</label>
+            <select id="pvpshop-enabled">
+              <option value="1" ${editing?.enabled !== false ? 'selected' : ''}>Oui</option>
+              <option value="0" ${editing?.enabled === false ? 'selected' : ''}>Non</option>
+            </select>
+          </div>
+        </div>
+        <div class="admin-actions">
+          <button class="admin-btn admin-btn-success" onclick="WBAdminPanel._savePvpShopListing()">💾 Enregistrer</button>
+          <button class="admin-btn admin-btn-primary" onclick="WBAdminPanel._clearPvpShopForm()">🗑️ Nouvelle fiche</button>
+        </div>
+      </div>
+      <hr class="admin-sep" />
+      <div class="admin-section">
+        <div class="admin-section-title">Articles du Comptoir (${(state.pvpShopListings || []).length})</div>
+        <div class="admin-list">${listingsHtml || '<p style="color:#888;font-size:.85rem;">Aucun article pour l’instant.</p>'}</div>
+      </div>
+    `;
+  }
+
+  let _pvpShopEditingId = null;
+
+  /** Sauvegarde dédiée à l'onglet Duel (stamina/ELO/paliers) */
+  function _saveDuelConfig() {
+    const state = WBGameState.get();
+    WBGameState.updateConfig({
+      combat: {
+        ...state.config.combat,
+        pvp: {
+          staminaMax:          parseInt(document.getElementById('pvp-stamina-max')?.value || '10'),
+          staminaRegenMinutes: parseInt(document.getElementById('pvp-stamina-regen')?.value || '180'),
+          staminaCostPerDuel:  parseInt(document.getElementById('pvp-stamina-cost')?.value || '1'),
+          combatLevel:         parseInt(document.getElementById('pvp-combat-level')?.value || '50'),
+          eloStarting:         parseInt(document.getElementById('pvp-elo-starting')?.value || '1000'),
+          eloKFactor:          parseInt(document.getElementById('pvp-elo-k')?.value || '24'),
+          rewardPerWin:        parseInt(document.getElementById('pvp-reward-per-win')?.value || '15'),
+          currencyName:        document.getElementById('pvp-currency-name')?.value.trim() || 'Instinct Primaire',
+          rewardTiers: Array.from(document.querySelectorAll('.pvp-tier-row')).map(row => ({
+            id:   row.dataset.tierId,
+            wins: parseInt(row.querySelector('.pvp-tier-wins')?.value || '0'),
+            reward: _readRewardFromEditor(`pvp-tier-${row.dataset.tierIdx}`),
+          })).sort((a, b) => a.wins - b.wins),
+        },
+      },
+    });
+    _notify('✅ Config Duel sauvegardée.');
+  }
+
+  function _addPvpTierRow() {
+    const state = WBGameState.get();
+    const tiers = [...((state.config.combat?.pvp || {}).rewardTiers || [])];
+    const lastWins = tiers.length ? tiers[tiers.length - 1].wins : 0;
+    tiers.push({ id: `pvp_tier_${Date.now()}`, wins: lastWins + 5, reward: { type: 'gold', amount: 300 } });
+    WBGameState.updateConfig({ combat: { ...state.config.combat, pvp: { ...(state.config.combat.pvp || {}), rewardTiers: tiers } } });
+    switchTab('duel');
+  }
+
+  function _removePvpTierRow(idx) {
+    const state = WBGameState.get();
+    const tiers = [...((state.config.combat?.pvp || {}).rewardTiers || [])];
+    tiers.splice(idx, 1);
+    WBGameState.updateConfig({ combat: { ...state.config.combat, pvp: { ...(state.config.combat.pvp || {}), rewardTiers: tiers } } });
+    switchTab('duel');
+  }
+
+  function _savePvpShopListing() {
+    const kind  = document.getElementById('pvpshop-kind')?.value;
+    const refId = document.getElementById('pvpshop-ref')?.value.trim();
+    if (!refId) { _notify('❌ Référence obligatoire.', 'error'); return; }
+    const data = {
+      id: _pvpShopEditingId || `pvpshop_${Date.now()}`,
+      kind, refId,
+      price: parseInt(document.getElementById('pvpshop-price')?.value || '100'),
+      enabled: document.getElementById('pvpshop-enabled')?.value !== '0',
+    };
+    if (_pvpShopEditingId) {
+      WBGameState.updatePvpShopListing(_pvpShopEditingId, data);
+      _notify('✅ Article mis à jour.');
+    } else {
+      WBGameState.addPvpShopListing(data);
+      _notify('✅ Article ajouté au Comptoir.');
+    }
+    _clearPvpShopForm();
+  }
+
+  function _editPvpShopListing(id) {
+    _pvpShopEditingId = id;
+    switchTab('duel');
+  }
+
+  function _deletePvpShopListing(id) {
+    if (!confirm('Supprimer cet article du Comptoir du Duel ?')) return;
+    WBGameState.removePvpShopListing(id);
+    if (_pvpShopEditingId === id) _pvpShopEditingId = null;
+    _notify('🗑️ Article supprimé.');
+    switchTab('duel');
+  }
+
+  function _clearPvpShopForm() {
+    _pvpShopEditingId = null;
+    switchTab('duel');
+  }
+
   function _renderTrophyTab() {
     const state = WBGameState.get();
     const cfg   = state.config;
@@ -6931,7 +7110,7 @@ const WBAdminPanel = (() => {
       },
     };
     // Bonus joueur
-    const bonusKeys = ['battles','victories','kills','captures','pulls','evolutions','awakenings','scoreTotal','scoreTeam','tourneeProgress','galleryEntries','trophyBestScore'];
+    const bonusKeys = ['battles','victories','kills','captures','pulls','evolutions','awakenings','scoreTotal','scoreTeam','tourneeProgress','galleryEntries','trophyBestScore','pvpWins'];
     const defaultBonus = WBGameDatabase.DEFAULT_CONFIG.playerBonus;
     const playerBonus = {};
     bonusKeys.forEach(k => {
@@ -7109,6 +7288,8 @@ const WBAdminPanel = (() => {
     _saveResources, _addResources, _saveEnergyConfig, _fillEnergy, _resetStats,
     _saveCombatConfig, _saveAdaptiveScaling, _previewAdaptiveScaling, _saveEnemyRarityWeights, _resetEnemyRarityWeights, _updateEnemyWeightTotal, _saveEnemyXpBonus,
     _renderTrophyTab, _saveTrophyConfig,
+    _renderDuelTab, _saveDuelConfig, _addPvpTierRow, _removePvpTierRow,
+    _savePvpShopListing, _editPvpShopListing, _deletePvpShopListing, _clearPvpShopForm,
     _addTrophyTierRow, _removeTrophyTierRow,
     _saveEventTemplate, _resetEventTemplate, _addEventTplQuest, _deleteEventTplQuest,
     _saveCurrentTag, _saveNextTag, _onTplDayTypeChange,

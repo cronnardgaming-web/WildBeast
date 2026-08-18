@@ -731,8 +731,8 @@ const WBGameUI = (() => {
       <div class="nav-new-btn" id="nav-gacha-btn" data-screen="gacha">
         <span class="nav-ico">📡</span><span class="nav-lbl">SIGNAL</span>
       </div>
-      <div class="nav-new-btn" id="nav-shop-btn" data-screen="shop">
-        <span class="nav-ico">🛍️</span><span class="nav-lbl">SHOP</span>
+      <div class="nav-new-btn" id="nav-duel-btn" data-screen="duel-hub">
+        <span class="nav-ico">🩸</span><span class="nav-lbl">DUEL</span>
       </div>
       <div class="nav-new-btn" id="nav-plus-btn">
         <span class="nav-ico">≡</span><span class="nav-lbl">PLUS</span>
@@ -759,19 +759,10 @@ const WBGameUI = (() => {
     const lockBadge = document.getElementById('hub-gacha-lock');
     if (lockBadge) lockBadge.style.display = gachaUnlocked ? 'none' : 'flex';
 
-    // Bouton Shop — verrouillé en même temps que le Signal
-    const shopBtn = document.getElementById('nav-shop-btn');
-    if (!gachaUnlocked && shopBtn) {
-      shopBtn.style.opacity = '.45';
-      shopBtn.title = 'Disponible au Chapitre 2, Stage 5';
-    }
-    shopBtn?.addEventListener('click', () => {
-      if (!WBGameState.isFeatureUnlocked?.('gacha')) {
-        _showToast('🔒 Shop disponible au Chapitre 2, Stage 5', 'info');
-        return;
-      }
-      showScreen('shop');
-      _setNavActive('shop');
+    // Bouton Duel — pas de condition de déblocage particulière pour l'instant
+    document.getElementById('nav-duel-btn')?.addEventListener('click', () => {
+      showScreen('duel-hub');
+      _setNavActive('duel-hub');
     });
 
     // Hub zones
@@ -959,6 +950,11 @@ const WBGameUI = (() => {
       leaderboard:      renderLeaderboard,
       'trophy-hub':     renderTrophyHub,
       'trophy-rewards': renderTrophyRewards,
+      'duel-hub':          renderDuelHub,
+      'duel-async':        renderDuelAsync,
+      'duel-defense-team': renderDuelDefenseTeam,
+      'duel-rewards':      renderDuelRewards,
+      'duel-shop':         renderDuelShop,
     };
     renderers[screenId]?.();
     _setNavActive(screenId);
@@ -969,6 +965,7 @@ const WBGameUI = (() => {
 
   function _updateHUD() {
     WBGameState.regenEnergy();
+    WBGameState.regenPvpStamina();
     const player = WBGameState.getPlayer();
     const cfg    = WBGameState.getConfig();
     const hud    = document.getElementById('hud');
@@ -1580,6 +1577,13 @@ L'ordre n'a pas d'importance — l'initiative dépend de la <b>Grâce</b> de cha
       text: `Des vagues de créatures Niveau 1 s'enchaînent à l'infini pendant un nombre de tours limité. Elles n'attaquent jamais — inflige un maximum de dégâts pour faire grimper ton score avant la fin du temps imparti.<br><br>
 Chaque ennemi vaincu est immédiatement remplacé par un nouveau, et rapporte un bonus de points. Aucun XP, Or ou Essence Sauvage n'est gagné sur ce mode — uniquement du score.<br><br>
 Ton meilleur score débloque des paliers de récompense, à réclamer manuellement sur l'écran <b>Récompenses</b> — rien n'est distribué automatiquement en fin de combat.`,
+    },
+    duel: {
+      title: '🩸 Duel à Distance',
+      text: `Affronte l'équipe de défense d'un autre joueur, choisi au hasard — ni lui ni toi n'êtes connectés en même temps, tout se joue instantanément.<br><br>
+Pour ce combat uniquement, toutes les créatures (des deux côtés) sont ramenées au même niveau : seuls l'équipement et les bonus de progression font la différence. Tes créatures retrouvent leur vrai niveau juste après.<br><br>
+Configure ton équipe de <b>défense</b> pour choisir qui te représente quand un autre joueur te tire au sort — sans elle, ton équipe active du moment est utilisée automatiquement.<br><br>
+Chaque duel coûte de la <b>stamina</b> (se régénère toute seule avec le temps) et fait varier ton <b>ELO</b> selon le résultat. Une victoire rapporte aussi de l'<b>Instinct Primaire</b> 🩸, à dépenser au Comptoir du Duel ou contre des paliers de récompense selon tes victoires cumulées.`,
     },
     gacha: {
       title: '💧 Conquêtes — Invocations',
@@ -2414,6 +2418,337 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   // ─── COMBAT ───────────────────────────────────────────────────────────────────
 
   /** Écran intermédiaire de la Traque : choix entre lancer un combat ou consulter/réclamer les récompenses */
+  /** Écran d'accueil du Duel : choix entre Duel à Distance (asynchrone) et Duel en Direct (verrouillé) */
+  /** Écran principal du Duel à Distance : stamina, ELO, historique, lancement de duel */
+  /** Lance la recherche d'adversaire : récupère un pool, joue la roulette, puis lance le combat */
+  async function _startDuelMatchmaking() {
+    const userId = WBBackend.getCurrentUserId?.();
+    if (!userId) { _showToast('Connexion requise.', 'error'); return; }
+
+    _showToast('🔎 Recherche d\'un adversaire...', 'info');
+    let pool = [];
+    try {
+      pool = await WBBackend.loadPvpOpponentPool(userId, 12);
+    } catch (e) { console.error(e); }
+
+    if (pool.length === 0) {
+      _showToast('❌ Aucun adversaire disponible pour l\'instant.', 'error');
+      return;
+    }
+
+    const winner = pool[Math.floor(Math.random() * pool.length)];
+    _showDuelRoulette(pool, winner, () => _launchPvpDuel(winner));
+  }
+
+  /** Affiche l'animation de roulette horizontale, puis appelle onDone une fois arrêtée sur "winner" */
+  function _showDuelRoulette(pool, winner, onDone) {
+    document.getElementById('duel-roulette-overlay')?.remove();
+    // La bande défile sur plusieurs tours complets du pool avant de s'arrêter sur "winner",
+    // placé en dernière position de la bande pour un arrêt net et lisible.
+    const strip = [...pool, ...pool, ...pool, winner];
+    const shell = document.querySelector('.app-shell') || document.body;
+    const overlay = document.createElement('div');
+    overlay.id = 'duel-roulette-overlay';
+    overlay.innerHTML = `
+      <div class="duel-roulette-title">🔎 Recherche d'un adversaire...</div>
+      <div class="duel-roulette-window">
+        <div class="duel-roulette-strip" id="duel-roulette-strip">
+          ${strip.map(p => `
+            <div class="duel-roulette-card">
+              <div class="duel-roulette-avatar">🧑‍🌾</div>
+              <div class="duel-roulette-name">${p.display_name || 'Ranger'}</div>
+              <div class="duel-roulette-elo">${Math.round(p.elo || 1000)} ELO</div>
+            </div>`).join('')}
+        </div>
+        <div class="duel-roulette-marker"></div>
+      </div>
+    `;
+    shell.appendChild(overlay);
+
+    // Calcule la distance à parcourir pour arrêter pile sur la dernière carte (winner), centrée
+    requestAnimationFrame(() => {
+      const stripEl = document.getElementById('duel-roulette-strip');
+      const cardEl  = stripEl?.querySelector('.duel-roulette-card');
+      const cardW   = (cardEl?.offsetWidth || 120) + 10; // + gap
+      const windowW = overlay.querySelector('.duel-roulette-window')?.offsetWidth || 320;
+      const targetX = (strip.length - 1) * cardW - (windowW / 2) + (cardW / 2);
+      stripEl.style.transition = 'transform 3.2s cubic-bezier(.12,.72,.13,1)';
+      stripEl.style.transform  = `translateX(-${targetX}px)`;
+    });
+
+    setTimeout(() => {
+      overlay.querySelector('.duel-roulette-window')?.classList.add('duel-roulette-landed');
+      setTimeout(() => {
+        overlay.style.opacity = '0';
+        setTimeout(() => { overlay.remove(); onDone(); }, 400);
+      }, 900);
+    }, 3300);
+  }
+
+  /** Construit les deux instantanés et lance réellement le combat PvP */
+  async function _launchPvpDuel(opponent) {
+    const state = WBGameState.get();
+    const cfg   = state.config.combat?.pvp || {};
+    const cost  = cfg.staminaCostPerDuel ?? 1;
+
+    // Déduire la stamina maintenant que l'adversaire est confirmé
+    const p = state.player;
+    p.pvp.stamina.current = Math.max(0, (p.pvp.stamina.current || 0) - cost);
+    WBGameState.updatePlayer({ pvp: p.pvp });
+
+    const playerSnapshot = _buildPvpSnapshotFromTeam(WBGameState.getTeam().map(i => i.instanceId));
+    const enemySnapshot  = opponent.team_snapshot || [];
+    if (playerSnapshot.length === 0) { _showToast('Compose une équipe avant de duel.', 'error'); return; }
+    if (enemySnapshot.length === 0)  { _showToast('Cet adversaire n\'a pas d\'équipe valide.', 'error'); return; }
+
+    showScreen('combat');
+    setTimeout(() => {
+      _battle = WBCombatEngine.start(_onBattleEvent, {
+        mode: 'pvp', playerSnapshot, enemySnapshot,
+        pvpOpponent: { userId: opponent.user_id, name: opponent.display_name || 'Ranger', elo: opponent.elo || 1000 },
+      });
+      if (!_battle) return;
+      _combatInProgress = true;
+      document.body.classList.add('battle-active');
+      const lobby = document.querySelector('.combat-lobby');
+      const battleArea = document.getElementById('battle-area');
+      if (lobby) lobby.style.display = 'none';
+      if (battleArea) battleArea.style.display = 'block';
+      const tabsEl = document.querySelector('.combat-mode-tabs'); if (tabsEl) tabsEl.style.display = 'none';
+      const navEl  = document.getElementById('main-nav'); if (navEl) navEl.style.display = 'none';
+      WBAudioSystem.playCombat();
+      _renderBattle();
+    }, 100);
+  }
+
+  function renderDuelAsync() {
+    const el = document.getElementById('screen-duel-async');
+    if (!el) return;
+    WBGameState.regenPvpStamina?.();
+    const state = WBGameState.get();
+    const pvp   = state.player.pvp || {};
+    const cfg   = state.config.combat?.pvp || {};
+    const staminaMax = cfg.staminaMax ?? 10;
+    const stamina    = pvp.stamina?.current ?? staminaMax;
+    const cost       = cfg.staminaCostPerDuel ?? 1;
+    const currencyName = cfg.currencyName || 'Instinct Primaire';
+
+    const historyHtml = (pvp.history || []).length === 0
+      ? '<p class="empty-msg">Aucun duel encore livré.</p>'
+      : pvp.history.map(h => `
+        <div class="duel-history-row ${h.won ? 'duel-history-won' : 'duel-history-lost'}">
+          <span>${h.won ? '✅' : '❌'} vs ${h.opponentName}</span>
+          <span>${h.eloChange >= 0 ? '+' : ''}${h.eloChange} ELO</span>
+        </div>`).join('');
+
+    el.innerHTML = `
+      <div class="screen-header"><h2>📡 Duel à Distance</h2>${_helpBtn('duel')}</div>
+      <div class="trophy-hub-screen">
+        <div class="trophy-hub-best" style="display:flex;justify-content:space-around;gap:8px;max-width:360px">
+          <div><div class="trophy-hub-best-label">ELO</div><div class="trophy-hub-best-value" style="font-size:1.2rem">${Math.round(pvp.elo ?? 1000)}</div></div>
+          <div><div class="trophy-hub-best-label">🩸 ${currencyName}</div><div class="trophy-hub-best-value" style="font-size:1.2rem">${pvp.currency || 0}</div></div>
+          <div><div class="trophy-hub-best-label">Stamina</div><div class="trophy-hub-best-value" style="font-size:1.2rem">${stamina}/${staminaMax}</div></div>
+        </div>
+
+        <button class="trophy-hub-btn trophy-hub-btn-combat" id="btn-launch-duel" ${stamina < cost ? 'style="opacity:.5"' : ''}>
+          <span class="trophy-hub-btn-icon">⚔️</span>
+          <span class="trophy-hub-btn-label">Lancer un duel</span>
+          <span class="trophy-hub-btn-desc">${stamina < cost ? 'Stamina insuffisante' : `Coûte ${cost} stamina`}</span>
+        </button>
+        <button class="trophy-hub-btn" id="btn-duel-defense">
+          <span class="trophy-hub-btn-icon">🛡️</span>
+          <span class="trophy-hub-btn-label">Équipe de défense</span>
+          <span class="trophy-hub-btn-desc">Configurer qui te défend</span>
+        </button>
+        <button class="trophy-hub-btn" id="btn-duel-rewards">
+          <span class="trophy-hub-btn-icon">🎁</span>
+          <span class="trophy-hub-btn-label">Récompenses</span>
+          <span class="trophy-hub-btn-desc">Paliers selon tes victoires</span>
+        </button>
+        <button class="trophy-hub-btn" id="btn-duel-shop">
+          <span class="trophy-hub-btn-icon">🩸</span>
+          <span class="trophy-hub-btn-label">Comptoir du Duel</span>
+          <span class="trophy-hub-btn-desc">Dépenser ton Instinct Primaire</span>
+        </button>
+
+        <div style="width:100%;max-width:320px">
+          <div class="equip-section-title">Historique récent</div>
+          <div class="duel-history-list">${historyHtml}</div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('btn-launch-duel')?.addEventListener('click', () => {
+      if (stamina < cost) { _showToast('Stamina insuffisante — patiente un peu.', 'error'); return; }
+      _startDuelMatchmaking();
+    });
+    document.getElementById('btn-duel-defense')?.addEventListener('click', () => showScreen('duel-defense-team'));
+    document.getElementById('btn-duel-rewards')?.addEventListener('click', () => showScreen('duel-rewards'));
+    document.getElementById('btn-duel-shop')?.addEventListener('click', () => showScreen('duel-shop'));
+  }
+
+  function renderDuelHub() {
+    const el = document.getElementById('screen-duel-hub');
+    if (!el) return;
+    const state = WBGameState.get();
+    const pvp   = state.player.pvp || {};
+
+    el.innerHTML = `
+      <div class="screen-header"><h2>🩸 Duel</h2>${_helpBtn('duel')}</div>
+      <div class="trophy-hub-screen">
+        <div class="trophy-hub-best">
+          <div class="trophy-hub-best-label">ELO actuel</div>
+          <div class="trophy-hub-best-value">${Math.round(pvp.elo ?? 1000)}</div>
+        </div>
+        <button class="trophy-hub-btn trophy-hub-btn-combat" id="btn-duel-async">
+          <span class="trophy-hub-btn-icon">📡</span>
+          <span class="trophy-hub-btn-label">Duel à Distance</span>
+          <span class="trophy-hub-btn-desc">Affronte l'équipe de défense d'un autre joueur</span>
+        </button>
+        <button class="trophy-hub-btn" id="btn-duel-live" style="opacity:.5;cursor:not-allowed">
+          <span class="trophy-hub-btn-icon">🔴</span>
+          <span class="trophy-hub-btn-label">Duel en Direct</span>
+          <span class="trophy-hub-btn-desc">🔒 Bientôt disponible</span>
+        </button>
+      </div>
+    `;
+
+    document.getElementById('btn-duel-async')?.addEventListener('click', () => showScreen('duel-async'));
+  }
+
+  let _defenseTeamDraft = null; // null tant que l'écran n'a pas été ouvert au moins une fois
+
+  /** Calcule les stats d'un exemplaire à un niveau FORCÉ (sans modifier l'exemplaire réel) */
+  function _computeStatsAtLevel(inst, def, forcedLevel) {
+    return _computeFullStats({ ...inst, level: forcedLevel }, def).total;
+  }
+
+  /** Construit l'instantané figé (niveau 50) d'une équipe donnée (tableau d'instanceId) */
+  function _buildPvpSnapshotFromTeam(instanceIds) {
+    const state = WBGameState.get();
+    const cfg   = state.config.combat?.pvp || {};
+    const lvl   = cfg.combatLevel || 50;
+    return instanceIds.map(iid => {
+      const inst = state.player.collection.find(c => c.instanceId === iid);
+      const def  = inst ? WBGameState.getCharDef(inst.charId) : null;
+      if (!inst || !def) return null;
+      const stats = _computeStatsAtLevel(inst, def, lvl);
+      return {
+        charId: def.id, name: def.name, portrait: def.portrait,
+        rarity: def.rarity, type1: def.type1, type2: def.type2 || null,
+        hp: stats.hp, atk: stats.atk, def: stats.def, spd: stats.spd,
+      };
+    }).filter(Boolean);
+  }
+
+  /** Publie l'équipe de défense actuelle du joueur sur Supabase (visible par les autres joueurs) */
+  async function _publishPvpDefenseTeam() {
+    const state = WBGameState.get();
+    const userId = WBBackend.getCurrentUserId?.();
+    if (!userId) return;
+    const teamIds = WBGameState.getPvpDefenseTeam();
+    const snapshot = _buildPvpSnapshotFromTeam(teamIds);
+    if (snapshot.length === 0) return;
+    const pvp = state.player.pvp || {};
+    try {
+      await WBBackend.savePvpDefenseTeam(
+        userId, state.player.name || 'Ranger', snapshot,
+        pvp.elo ?? 1000, state.player.stats?.totalPvpWins || 0, state.player.stats?.totalPvpLosses || 0
+      );
+    } catch (e) { console.error('[Duel] Publication équipe de défense :', e); }
+  }
+
+  /** Écran de configuration de l'équipe de défense PvP */
+  function renderDuelDefenseTeam() {
+    const el = document.getElementById('screen-duel-defense-team');
+    if (!el) return;
+    const state = WBGameState.get();
+    const cfg   = state.config;
+    if (!_defenseTeamDraft) _defenseTeamDraft = [...WBGameState.getPvpDefenseTeam()];
+
+    el.innerHTML = `
+      <div class="screen-header"><h2>🛡️ Équipe de défense</h2>${_helpBtn('duel')}</div>
+      <p style="font-size:.8rem;color:var(--text-dim);padding:0 16px 8px">
+        C'est cette équipe que les autres joueurs affronteront quand ils te tirent au sort. Tant que tu ne l'enregistres pas, ton équipe active du moment est utilisée automatiquement.
+      </p>
+      <div class="team-slots" id="defense-team-slots">
+        ${Array.from({length: cfg.game.maxTeamSize}, (_, i) => {
+          const iid = _defenseTeamDraft[i];
+          const member = iid ? state.player.collection.find(c => c.instanceId === iid) : null;
+          const def    = member ? WBGameState.getCharDef(member.charId) : null;
+          const stats  = (member && def) ? _computeFullStats(member, def).total : null;
+          return `
+          <div class="team-slot ${member ? 'filled' : 'empty'}" data-slot="${i}">
+            ${member && def ? `
+              <div class="team-member-card" data-instance-id="${member.instanceId}">
+                <div class="team-portrait">${_portraitImgHtml(def)}</div>
+                <div class="team-info">
+                  <div class="team-name">${def.name}</div>
+                  <div class="team-level">Niv. ${member.level}</div>
+                  <div class="team-stats-mini">
+                    <span>💗 ${stats.hp}</span><span>💪 ${stats.atk}</span><span>🛡️ ${stats.def}</span><span>🐆 ${stats.spd}</span>
+                  </div>
+                </div>
+                <button class="btn-remove-team" data-instance-id="${member.instanceId}">✕</button>
+              </div>` : `<div class="empty-slot-label">+ Ajouter</div>`}
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="admin-actions" style="padding:0 16px">
+        <button class="admin-btn admin-btn-success" id="btn-save-defense-team">💾 Enregistrer l'équipe de défense</button>
+      </div>
+      <div class="screen-header" style="margin-top:1.5rem"><h2>Collection</h2></div>
+      <div class="card-grid" id="defense-team-collection-grid"></div>
+    `;
+
+    _refreshDefenseTeamGrid();
+
+    el.querySelectorAll('.btn-remove-team').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        _defenseTeamDraft = _defenseTeamDraft.filter(id => id !== btn.dataset.instanceId);
+        renderDuelDefenseTeam();
+      });
+    });
+    document.getElementById('btn-save-defense-team')?.addEventListener('click', async () => {
+      if (_defenseTeamDraft.filter(Boolean).length === 0) { _showToast('Ajoute au moins une créature.', 'error'); return; }
+      WBGameState.setPvpDefenseTeam(_defenseTeamDraft.filter(Boolean));
+      await _publishPvpDefenseTeam();
+      _showToast('🛡️ Équipe de défense enregistrée !', 'success');
+    });
+  }
+
+  function _refreshDefenseTeamGrid() {
+    const state = WBGameState.get();
+    const cfg   = state.config;
+    const grid  = document.getElementById('defense-team-collection-grid');
+    if (!grid) return;
+    const inTeam = new Set(_defenseTeamDraft.filter(Boolean));
+    grid.innerHTML = state.player.collection.map(inst => {
+      const def = WBGameState.getCharDef(inst.charId);
+      if (!def) return '';
+      const selected = inTeam.has(inst.instanceId);
+      return `
+        <div class="char-card ${selected ? 'selected-for-team' : ''}" data-instance-id="${inst.instanceId}">
+          <div class="char-card-portrait">${_portraitImgHtml(def)}</div>
+          <div class="char-card-name">${def.name}</div>
+          <div class="char-card-level">Niv. ${inst.level}</div>
+        </div>`;
+    }).join('');
+    grid.querySelectorAll('.char-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const iid = card.dataset.instanceId;
+        if (_defenseTeamDraft.includes(iid)) {
+          _defenseTeamDraft = _defenseTeamDraft.filter(id => id !== iid);
+        } else {
+          if (_defenseTeamDraft.filter(Boolean).length >= cfg.game.maxTeamSize) { _showToast('Équipe complète.', 'error'); return; }
+          _defenseTeamDraft.push(iid);
+        }
+        renderDuelDefenseTeam();
+      });
+    });
+  }
+
   function renderTrophyHub() {
     const el = document.getElementById('screen-trophy-hub');
     if (!el) return;
@@ -2453,6 +2788,105 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   }
 
   /** Écran des récompenses de la Traque — un "totem" de paliers de score, à réclamer manuellement */
+  /** Écran des récompenses PvP — paliers selon le nombre de victoires cumulées */
+  function renderDuelRewards() {
+    const el = document.getElementById('screen-duel-rewards');
+    if (!el) return;
+    const state = WBGameState.get();
+    const wins = state.player.stats?.totalPvpWins || 0;
+    const claimedIds = new Set(state.player.pvp?.tiersReached || []);
+    const tiers = [...(state.config.combat?.pvp?.rewardTiers || [])].sort((a, b) => b.wins - a.wins);
+
+    el.innerHTML = `
+      <div class="screen-header"><h2>🎁 Récompenses PvP</h2>${_helpBtn('duel')}</div>
+      <div class="trophy-totem">
+        <div class="trophy-totem-best">🏆 Victoires : <strong>${wins}</strong></div>
+        <div class="trophy-totem-pole">
+          ${tiers.length === 0 ? '<p class="empty-msg">Aucun palier configuré.</p>' : tiers.map(t => {
+            const claimed   = claimedIds.has(t.id);
+            const reachable = wins >= t.wins;
+            const status    = claimed ? 'claimed' : reachable ? 'claimable' : 'locked';
+            return `
+              <div class="trophy-totem-tier trophy-totem-tier-${status}" data-tier-id="${t.id}">
+                <div class="trophy-totem-tier-score">${t.wins} 🏆</div>
+                <div class="trophy-totem-tier-reward">${_formatRewardLabel(t.reward, state)}</div>
+                ${claimed
+                  ? `<div class="trophy-totem-tier-status">✅ Réclamée</div>`
+                  : reachable
+                    ? `<button class="trophy-totem-claim-btn" data-tier-id="${t.id}">Réclamer</button>`
+                    : `<div class="trophy-totem-tier-status">🔒 ${t.wins} victoires requises</div>`}
+              </div>`;
+          }).join('')}
+          <div class="trophy-totem-base">🗿</div>
+        </div>
+      </div>
+    `;
+
+    el.querySelectorAll('.trophy-totem-claim-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const res = WBGameState.claimPvpRewardTier(btn.dataset.tierId);
+        if (res.success) {
+          _showToast('🎁 Récompense réclamée !', 'success');
+          _updateHUD();
+          renderDuelRewards();
+        } else {
+          _showToast('❌ Impossible de réclamer cette récompense.', 'error');
+        }
+      });
+    });
+  }
+
+  /** Écran du Comptoir du Duel — boutique dédiée, prix toujours en 🩸 Instinct Primaire */
+  function renderDuelShop() {
+    const el = document.getElementById('screen-duel-shop');
+    if (!el) return;
+    const state = WBGameState.get();
+    const currencyName = state.config.combat?.pvp?.currencyName || 'Instinct Primaire';
+    const balance = state.player.pvp?.currency || 0;
+
+    const resolveRef = (l) => l.kind === 'equipment'
+      ? state.equipment.find(e => e.id === l.refId)
+      : state.items.find(i => i.id === l.refId);
+
+    const listings = (state.pvpShopListings || []).filter(l => l.enabled !== false);
+    const cardsHtml = listings.map(l => {
+      const ref = resolveRef(l);
+      if (!ref) return '';
+      const canAfford = balance >= l.price;
+      const rarityDef = l.kind === 'equipment' ? (WBGameDatabase.RARITIES[ref.rarity] || {}) : {};
+      const icon = l.kind === 'item' ? (ref.icon || '📦') : (EQUIP_SLOT_ICON[ref.slot] || '⚙️');
+      return `
+        <div class="shop-card" data-listing-id="${l.id}">
+          <div class="shop-card-portrait" style="${rarityDef.color ? `border-color:${rarityDef.color}` : ''}">
+            <span style="font-size:1.8rem">${icon}</span>
+          </div>
+          <div class="shop-card-name">${ref.name}</div>
+          ${rarityDef.name ? `<div class="shop-card-rarity" style="color:${rarityDef.color}">${rarityDef.name}</div>` : ''}
+          <button class="btn-shop-buy btn-pvp-shop-buy" data-listing-id="${l.id}" ${canAfford ? '' : 'disabled'}>
+            ${l.price.toLocaleString()} 🩸
+          </button>
+        </div>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="screen-header"><h2>🩸 Comptoir du Duel</h2>${_helpBtn('duel')}</div>
+      <div style="text-align:center;padding:8px 0 16px;font-size:.9rem">🩸 <strong>${balance.toLocaleString('fr-FR')}</strong> ${currencyName}</div>
+      <div class="shop-grid">${cardsHtml || '<p class="empty-msg">Le Comptoir est vide pour l’instant.</p>'}</div>
+    `;
+
+    el.querySelectorAll('.btn-pvp-shop-buy:not(:disabled)').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const res = WBGameState.purchasePvpShopListing(btn.dataset.listingId);
+        if (res.success) {
+          _showToast('✅ Achat réussi !', 'success');
+          renderDuelShop();
+        } else {
+          _showToast('❌ Achat impossible.', 'error');
+        }
+      });
+    });
+  }
+
   function renderTrophyRewards() {
     const el = document.getElementById('screen-trophy-rewards');
     if (!el) return;
@@ -3166,6 +3600,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
 
     if (event === 'victory') {
       _resetCombatAnimQueue();
+      if (_battle?.mode === 'pvp') { _showDuelResult(data); return; }
       if (_tutorialCombatEndCb) {
         const cb = _tutorialCombatEndCb;
         _tutorialCombatEndCb = null;
@@ -3198,6 +3633,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     }
     if (event === 'defeat') {
       _resetCombatAnimQueue();
+      if (_battle?.mode === 'pvp') { _showDuelResult(data); return; }
       if (_tutorialCombatEndCb) {
         const cb = _tutorialCombatEndCb;
         _tutorialCombatEndCb = null;
@@ -4043,6 +4479,51 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   }
 
   /** Écran de fin dédié au mode Trophée : score final, record battu, paliers débloqués */
+  /** Écran de résultat dédié au Duel à Distance : variation d'ELO, Instinct Primaire gagné */
+  function _showDuelResult(data) {
+    WBAudioSystem.playResultSfx(data.rewards?.didWin ? 'victory' : 'defeat');
+    document.getElementById('duel-result-overlay')?.remove();
+
+    const r = data.rewards || {};
+    const opponentName = _battle?.pvpOpponent?.name || 'Adversaire';
+    const currencyName = WBGameState.get().config.combat?.pvp?.currencyName || 'Instinct Primaire';
+
+    const shell = document.querySelector('.app-shell') || document.body;
+    const overlay = document.createElement('div');
+    overlay.id = 'duel-result-overlay';
+    overlay.style.cssText = `
+      position:absolute; inset:0; z-index:8000; background:#09040f;
+      display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+      overflow-y:auto; padding:32px 20px 40px; opacity:0; transition:opacity 500ms ease;
+    `;
+    overlay.innerHTML = `
+      <div class="bro-victory-top">
+        <div class="bro-glow-ring"></div>
+        <div class="bro-title">${r.didWin ? '🏆 VICTOIRE' : '💀 DÉFAITE'}</div>
+        <div class="bro-subtitle" style="margin-top:8px">contre ${opponentName}</div>
+        <div class="bro-subtitle" style="font-size:1.4rem;font-weight:800;color:${r.eloChange >= 0 ? 'var(--success)' : 'var(--danger)'};margin-top:10px">
+          ${r.eloChange >= 0 ? '+' : ''}${r.eloChange} ELO <span style="font-size:.85rem;color:var(--text-dim);font-weight:600">(${r.newElo})</span>
+        </div>
+        ${r.currencyEarned ? `<div class="bro-subtitle" style="margin-top:6px">🩸 +${r.currencyEarned} ${currencyName}</div>` : ''}
+      </div>
+      <button class="btn-primary bro-back-btn" id="btn-duel-result-back">Retour</button>
+    `;
+    shell.appendChild(overlay);
+    requestAnimationFrame(() => requestAnimationFrame(() => { overlay.style.opacity = '1'; }));
+
+    document.getElementById('btn-duel-result-back')?.addEventListener('click', () => {
+      overlay.style.opacity = '0';
+      setTimeout(() => {
+        overlay.remove();
+        WBCombatEngine.reset();
+        _battle = null;
+        document.body.classList.remove('battle-active');
+        WBAudioSystem.playGlobal();
+        showScreen('duel-async');
+      }, 500);
+    });
+  }
+
   function _showTrophyResult(data) {
     WBAudioSystem.playResultSfx('victory');
     document.getElementById('trophy-result-overlay')?.remove();
@@ -5873,6 +6354,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     { col: 'tournee_progress', label: '🌍 Expédition', unit: '🌍 Niv.' },
     { col: 'gallery_entries',  label: '📚 Encyclopédie', unit: '📚' },
     { col: 'trophy_best_score', label: '🎯 Traque', unit: '🎯' },
+    { col: 'pvp_elo',           label: '🩸 Duel',   unit: 'ELO' },
   ];
 
   function renderLeaderboard() {

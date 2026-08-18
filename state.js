@@ -85,6 +85,7 @@ const WBGameState = (() => {
       equipment:    JSON.parse(JSON.stringify(WBGameDatabase.DEFAULT_EQUIPMENT)),
       items:        JSON.parse(JSON.stringify(WBGameDatabase.DEFAULT_ITEMS)),
       shopListings: JSON.parse(JSON.stringify(WBGameDatabase.DEFAULT_SHOP_LISTINGS)),
+      pvpShopListings: JSON.parse(JSON.stringify(WBGameDatabase.DEFAULT_PVP_SHOP_LISTINGS)),
       dailyLoginCycles: JSON.parse(JSON.stringify(WBGameDatabase.DEFAULT_DAILY_LOGIN_CYCLES)),
       dailyQuests:      JSON.parse(JSON.stringify(WBGameDatabase.DEFAULT_DAILY_QUESTS)),
       permanentQuests:  JSON.parse(JSON.stringify(WBGameDatabase.DEFAULT_PERMANENT_QUESTS)),
@@ -141,6 +142,7 @@ const WBGameState = (() => {
       equipment:    saved.equipment    || defaults.equipment,
       items:        _mergeItems(defaults.items, saved.items),
       shopListings: saved.shopListings || defaults.shopListings,
+      pvpShopListings: saved.pvpShopListings || defaults.pvpShopListings,
       dailyLoginCycles: saved.dailyLoginCycles || defaults.dailyLoginCycles,
       dailyQuests:      _mergeDailyQuests(defaults.dailyQuests, saved.dailyQuests),
       permanentQuests:  saved.permanentQuests || defaults.permanentQuests,
@@ -210,6 +212,11 @@ const WBGameState = (() => {
       stats:     { ...defaults.stats,      ...(saved.stats     || {}) },
       catalogue: catalogue,   // ← clé unifiée ; les anciennes clés ne sont plus utilisées
       story:     { ...defaults.story,      ...(saved.story     || {}) },
+      pvp: {
+        ...defaults.pvp,
+        ...(saved.pvp || {}),
+        stamina: { ...defaults.pvp.stamina, ...(saved.pvp?.stamina || {}) },
+      },
       dailyLogin: {
         progress: { ...(saved.dailyLogin?.progress || {}) },
       },
@@ -552,6 +559,22 @@ const WBGameState = (() => {
     }
   }
 
+  /** Régénération de la stamina PvP — ressource dédiée, distincte de l'énergie */
+  function regenPvpStamina() {
+    const cfg = _state.config?.combat?.pvp;
+    const p = _state.player.pvp;
+    if (!cfg || !p?.stamina) return;
+    const now = Date.now();
+    const regenMinutes = cfg.staminaRegenMinutes || 180;
+    const elapsed = (now - (p.stamina.lastRegen || now)) / 60000;
+    const regen = Math.floor(elapsed / regenMinutes);
+    if (regen > 0) {
+      const max = cfg.staminaMax ?? p.stamina.max ?? 10;
+      p.stamina.current = Math.min(max, p.stamina.current + regen);
+      p.stamina.lastRegen = now;
+    }
+  }
+
   // ─── MUTATIONS ADMIN ─────────────────────────────────────────────────────────
 
   /** Remplace la config globale */
@@ -842,6 +865,68 @@ const WBGameState = (() => {
    * @param {string} listingId
    * @returns {{success:boolean, reason?:string}}
    */
+  /** Ajoute un article au Comptoir du Duel */
+  function addPvpShopListing(data) {
+    _state.pvpShopListings = [...(_state.pvpShopListings || []), data];
+    _notify('pvpShopListingAdded');
+    _autoSave();
+  }
+
+  /** Met à jour un article du Comptoir du Duel */
+  function updatePvpShopListing(id, data) {
+    const idx = (_state.pvpShopListings || []).findIndex(l => l.id === id);
+    if (idx === -1) return false;
+    _state.pvpShopListings[idx] = { ..._state.pvpShopListings[idx], ...data };
+    _notify('pvpShopListingChanged');
+    _autoSave();
+    return true;
+  }
+
+  /** Supprime un article du Comptoir du Duel */
+  function removePvpShopListing(id) {
+    _state.pvpShopListings = (_state.pvpShopListings || []).filter(l => l.id !== id);
+    _notify('pvpShopListingRemoved');
+    _autoSave();
+  }
+
+  /** Achète un article du Comptoir du Duel (toujours payé en Instinct Primaire) */
+  function purchasePvpShopListing(listingId) {
+    const listing = (_state.pvpShopListings || []).find(l => l.id === listingId);
+    if (!listing || listing.enabled === false) return { success: false, reason: 'unavailable' };
+
+    _state.player.pvp = _state.player.pvp || { currency: 0 };
+    const balance = _state.player.pvp.currency || 0;
+    if (balance < listing.price) return { success: false, reason: 'insufficient_funds' };
+    _state.player.pvp.currency = balance - listing.price;
+
+    if (listing.kind === 'equipment') {
+      const equipDef = _state.equipment.find(e => e.id === listing.refId);
+      const instance = {
+        instanceId: `einst_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        equipId:    listing.refId,
+        level:      WBGameDatabase.rollEquipLevel(equipDef?.rarity),
+        obtainedAt: Date.now(),
+        equippedBy: null,
+      };
+      _state.player.equipInventory = [...(_state.player.equipInventory || []), instance];
+      _notify('equipmentPurchased', { instance });
+      _autoSave();
+      return { success: true, kind: 'equipment', instance };
+    }
+
+    if (listing.kind === 'item') {
+      const inv = { ...(_state.player.inventory || {}) };
+      inv[listing.refId] = (inv[listing.refId] || 0) + 1;
+      _state.player.inventory = inv;
+      _notify('itemPurchased', { refId: listing.refId });
+      _autoSave();
+      return { success: true, kind: 'item' };
+    }
+
+    _autoSave();
+    return { success: false, reason: 'unsupported_kind' };
+  }
+
   function purchaseShopListing(listingId, priceOverride) {
     const listing = _state.shopListings.find(l => l.id === listingId);
     if (!listing || listing.enabled === false) return { success: false, reason: 'unavailable' };
@@ -1154,6 +1239,7 @@ const WBGameState = (() => {
       trophyBestScore: _state.player.trophy?.bestScore || 0,
       collectionSize:  (_state.player.collection || []).length,
       playerLevel:     _state.player.level || 1,
+      pvpWins:         stats.totalPvpWins || 0,
     };
     if (!excludeKeys.includes('scoreTotal')) mapping.scoreTotal = getPlayerAuraScoreTotal();
     if (!excludeKeys.includes('scoreTeam'))  mapping.scoreTeam  = getPlayerAuraScoreTeam();
@@ -1216,6 +1302,87 @@ const WBGameState = (() => {
    * @param {string} questId
    * @param {string} tierId
    */
+  // ─── DUEL À DISTANCE (PvP asynchrone) ───────────────────────────────────────
+
+  /** Équipe de défense configurée par le joueur — retombe sur l'équipe active si jamais configurée */
+  function getPvpDefenseTeam() {
+    const configured = _state.player.pvp?.defenseTeam;
+    return (configured && configured.length > 0) ? configured : _state.player.team;
+  }
+
+  /** Enregistre l'équipe de défense choisie par le joueur (tableau d'instanceId) */
+  function setPvpDefenseTeam(instanceIds) {
+    _state.player.pvp = _state.player.pvp || {};
+    _state.player.pvp.defenseTeam = instanceIds;
+    _notify('pvpDefenseTeamChanged');
+    _autoSave();
+  }
+
+  /**
+   * Calcule le nouvel ELO après un duel (formule ELO standard).
+   * @param {number} myElo
+   * @param {number} opponentElo
+   * @param {boolean} didWin
+   * @returns {{newElo:number, change:number}}
+   */
+  function computePvpEloChange(myElo, opponentElo, didWin) {
+    const k = _state.config.combat?.pvp?.eloKFactor ?? 24;
+    const expected = 1 / (1 + Math.pow(10, (opponentElo - myElo) / 400));
+    const actual   = didWin ? 1 : 0;
+    const change    = Math.round(k * (actual - expected));
+    return { newElo: Math.max(0, myElo + change), change };
+  }
+
+  /**
+   * Enregistre le résultat d'un duel PvP : ELO, victoires/défaites, Instinct
+   * Primaire gagné (uniquement en cas de victoire), historique des 5 derniers
+   * duels. Aucun XP/Or/Essence Sauvage n'est distribué ici.
+   * @param {boolean} didWin
+   * @param {string} opponentName
+   * @param {number} opponentElo
+   */
+  function registerPvpResult(didWin, opponentName, opponentElo) {
+    const p = _state.player;
+    p.pvp = p.pvp || { stamina: { current: 10, max: 10, lastRegen: Date.now() }, elo: 1000, currency: 0, defenseTeam: null, tiersReached: [], history: [] };
+    const cfg = _state.config.combat?.pvp || {};
+
+    const { newElo, change } = computePvpEloChange(p.pvp.elo ?? cfg.eloStarting ?? 1000, opponentElo, didWin);
+    p.pvp.elo = newElo;
+
+    if (didWin) p.pvp.currency = (p.pvp.currency || 0) + (cfg.rewardPerWin ?? 15);
+
+    p.stats.totalPvpBattles = (p.stats.totalPvpBattles || 0) + 1;
+    if (didWin) p.stats.totalPvpWins = (p.stats.totalPvpWins || 0) + 1;
+    else        p.stats.totalPvpLosses = (p.stats.totalPvpLosses || 0) + 1;
+
+    p.pvp.history = [{ opponentName, won: didWin, eloChange: change, timestamp: Date.now() }, ...(p.pvp.history || [])].slice(0, 5);
+
+    _notify('pvpResultRegistered', { didWin, eloChange: change, newElo });
+    _autoSave();
+    return { eloChange: change, newElo, currencyEarned: didWin ? (cfg.rewardPerWin ?? 15) : 0 };
+  }
+
+  /**
+   * Réclame la récompense d'un palier PvP (nombre de victoires cumulées)
+   * déjà atteint et pas encore réclamé.
+   * @param {string} tierId
+   */
+  function claimPvpRewardTier(tierId) {
+    const p = _state.player;
+    p.pvp = p.pvp || {};
+    const tier = (_state.config.combat?.pvp?.rewardTiers || []).find(t => t.id === tierId);
+    if (!tier) return { success: false, reason: 'tier_not_found' };
+    if ((p.stats.totalPvpWins || 0) < tier.wins) return { success: false, reason: 'not_enough_wins' };
+    if ((p.pvp.tiersReached || []).includes(tierId)) return { success: false, reason: 'already_claimed' };
+
+    p.pvp.tiersReached = [...(p.pvp.tiersReached || []), tierId];
+    _grantReward(tier.reward);
+
+    _notify('pvpTierClaimed', { tierId, tier });
+    _autoSave();
+    return { success: true };
+  }
+
   function claimPermanentQuestTier(questId, tierId) {
     const quest = (_state.permanentQuests || []).find(q => q.id === questId);
     if (!quest) return { success: false, reason: 'quest_not_found' };
@@ -1302,6 +1469,7 @@ const WBGameState = (() => {
       tourneeProgress: getTourneeProgress(),
       galleryEntries:  Object.keys(_state.player.catalogue || {}).length,
       trophyBestScore: _state.player.trophy?.bestScore || 0,
+      pvpElo:          _state.player.pvp?.elo || 1000,
     };
   }
 
@@ -2017,7 +2185,7 @@ const WBGameState = (() => {
     getPlayer, getConfig, getTypes, getMatrix,
     getCharDefs, getEquipDefs, getBanners, getCharDef, getPlayerChar, getTeam,
     addCharacterToCollection, addXpToCharacter, addXpToPlayer, setTeam, equipItem,
-    modifyResources, regenEnergy,
+    modifyResources, regenEnergy, regenPvpStamina,
     updateConfig, updateCharDef, addCharDef, removeCharDef, reorderCharDefs,
     updateTypeMatrix, updateTypes, reorderTypes, addEquipDef, updateEquipDef, removeEquipDef, reorderEquipDefs,
     addPassive, updatePassive, removePassive, getPassivesForCharacter,
@@ -2025,6 +2193,7 @@ const WBGameState = (() => {
     addTag, updateTag, removeTag, addTagToLine, removeTagFromLine,
     addItemDef, updateItemDef, removeItemDef, useItem,
     addShopListing, updateShopListing, removeShopListing, purchaseShopListing,
+    addPvpShopListing, updatePvpShopListing, removePvpShopListing, purchasePvpShopListing,
     refreshRotatingShop, getRotatingShopListings,
     checkEvent, getActiveEvent, setEventConfig, setNextEventConfig, setNextEventTag, setCurrentEventTag,
     trackEventQuestProgress, claimEventQuest, planifyNextEvent, getPlayerStatBonus,
@@ -2033,6 +2202,7 @@ const WBGameState = (() => {
     getStoryChapterProgress, completeStoryStage, isFeatureUnlocked,
     addDailyLoginCycle, updateDailyLoginCycle, removeDailyLoginCycle, getDailyLoginClaimable, claimDailyLoginReward,
     registerTrophyScore, claimTrophyRewardTier,
+    getPvpDefenseTeam, setPvpDefenseTeam, computePvpEloChange, registerPvpResult, claimPvpRewardTier,
     getLiveStatValue, addPermanentQuest, updatePermanentQuest, removePermanentQuest, claimPermanentQuestTier,
     addDailyQuest, updateDailyQuest, removeDailyQuest, checkDailyQuests, trackQuestProgress, claimDailyQuest,
     checkWeeklyQuests, claimWeeklyQuest,

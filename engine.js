@@ -24,6 +24,38 @@ const WBCombatEngine = (() => {
    * @param {boolean} isEnemy
    * @returns {object} Combattant
    */
+  /**
+   * Construit un combattant PvP directement depuis un instantané déjà figé
+   * (stats déjà calculées au niveau 50, équipement déjà inclus) — aucun lookup
+   * de collection/équipement en direct, contrairement à _buildCombatant.
+   */
+  function _buildCombatantFromSnapshot(entry, isEnemy, idx) {
+    const charDefLike = { id: entry.charId, name: entry.name, portrait: entry.portrait, rarity: entry.rarity, type1: entry.type1, type2: entry.type2 };
+    return {
+      instanceId: `pvp_${isEnemy ? 'enemy' : 'player'}_${idx}_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+      charId:     entry.charId,
+      name:       entry.name,
+      portrait:   entry.portrait,
+      rarity:     entry.rarity,
+      type1:      entry.type1,
+      type2:      entry.type2,
+      level:      50,
+      awakening:  0,
+      isEnemy,
+      maxHp:      entry.hp,
+      currentHp:  entry.hp,
+      atk:        entry.atk,
+      def:        entry.def,
+      spd:        entry.spd,
+      alive:      true,
+      captured:   false,
+      passives:        WBGameState.getPassivesForCharacter(charDefLike),
+      extraPassiveIds: [],
+      statusEffects:   [],
+      tempAtkBuffPercent: 0,
+    };
+  }
+
   function _buildCombatant(instance, charDef, isEnemy) {
     const state   = WBGameState.get();
     const cfg     = state.config;
@@ -847,7 +879,7 @@ const WBCombatEngine = (() => {
     // Vérifier l'énergie (coût spécifique au mode)
     const player = WBGameState.getPlayer();
     const energyCost = cfg.energy.costs?.[mode] ?? cfg.energy.combatCost ?? 10;
-    if (cfg.energy.enabled && player.energy.current < energyCost && mode !== 'tutorial') {
+    if (cfg.energy.enabled && player.energy.current < energyCost && mode !== 'tutorial' && mode !== 'pvp') {
       _emit('error', { message: 'Énergie insuffisante !' });
       return null;
     }
@@ -886,6 +918,33 @@ const WBCombatEngine = (() => {
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
       }
       WBGameState.setTeam(shuffled.slice(0, cfg.game.maxTeamSize).map(inst => inst.instanceId));
+    }
+
+    // ── Mode PvP (Duel à Distance) : équipes construites depuis des instantanés
+    // déjà figés (niveau 50, stats déjà calculées) — ni lookup de collection, ni
+    // équipement en direct. Court-circuite toute la construction normale.
+    if (mode === 'pvp') {
+      const playerSnap = options.playerSnapshot || [];
+      const enemySnap   = options.enemySnapshot   || [];
+      if (playerSnap.length === 0 || enemySnap.length === 0) {
+        _emit('error', { message: 'Impossible de construire les équipes du duel.' });
+        return null;
+      }
+      const playerTeamPvp = playerSnap.map((entry, i) => _buildCombatantFromSnapshot(entry, false, i));
+      const enemyTeamPvp  = enemySnap.map((entry, i) => _buildCombatantFromSnapshot(entry, true, i));
+
+      _battle = {
+        turn: 1, phase: 'player', mode, lineId: null, arenaType: null,
+        storyWorld: null, storySubLevel: null, storyChapter: null, storyStage: null,
+        restoreTeam: null,
+        playerTeam: playerTeamPvp, enemyTeam: enemyTeamPvp,
+        turnOrder: [], turnIndex: 0, currentActor: null,
+        log: [], result: null, capturable: [], rewards: null,
+        trophyScore: null,
+        pvpOpponent: options.pvpOpponent || null, // { userId, name, elo }
+      };
+      _startRound();
+      return _battle;
     }
 
     // Construire l'équipe joueur
@@ -1253,7 +1312,8 @@ const WBCombatEngine = (() => {
     if (alive.length === 0) return targets[0] || null;
 
     // 25% du temps : attaque aléatoire plutôt que le meilleur choix tactique
-    if (Math.random() < 0.25) {
+    // — SAUF en mode PvP, où l'adversaire joue toujours optimalement.
+    if (_battle?.mode !== 'pvp' && Math.random() < 0.25) {
       return alive[Math.floor(Math.random() * alive.length)];
     }
 
@@ -1469,6 +1529,17 @@ const WBCombatEngine = (() => {
       WBGameState.trackQuestProgress('play_trophy');
       _battle.rewards = { trophyScore: finalScore, isNewBest };
       _emit(result === 'trophy_end' ? 'trophyEnd' : result, { rewards: _battle.rewards, battle: _battle });
+      return;
+    }
+
+    // ── Mode PvP (Duel à Distance) : fin dédiée, aucun XP/Or/Essence Sauvage —
+    // uniquement variation d'ELO + Instinct Primaire en cas de victoire.
+    if (_battle.mode === 'pvp') {
+      const didWin = result === 'victory';
+      const opp = _battle.pvpOpponent || { name: 'Adversaire', elo: 1000 };
+      const pvpResult = WBGameState.registerPvpResult(didWin, opp.name, opp.elo);
+      _battle.rewards = { didWin, ...pvpResult };
+      _emit(result, { rewards: _battle.rewards, battle: _battle });
       return;
     }
 

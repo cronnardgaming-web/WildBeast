@@ -13,14 +13,8 @@
 const WBBackend = (() => {
 
   // Project URL + clé publique (sûre à exposer côté client, cf. RLS pour la sécurité réelle)
-  // ⚠️ IMPORTANT : projet Supabase SÉPARÉ de ChronoWaifu Chronicles.
-  // Ne jamais réutiliser les identifiants de l'autre jeu : ils partageraient
-  // alors les mêmes tables (game_data, player_saves, profiles...) et les
-  // mêmes comptes joueurs. Crée un nouveau projet sur supabase.com, exécute
-  // le script SQL de mise en place des tables (identique à ChronoWaifu, à
-  // rejouer sur ce nouveau projet), puis colle ici son URL et sa clé publique.
-  const SUPABASE_URL = 'https://dvssuwhgcxpjdbkqllnt.supabase.co'; // TODO
-  const SUPABASE_KEY = 'sb_publishable_lgqyY4rrTMefClxYclHfpQ_uCX-grLg';                // TODO
+  const SUPABASE_URL = 'https://dvssuwhgcxpjdbkqllnt.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_lgqyY4rrTMefClxYclHfpQ_uCX-grLg';
 
   let _client = null;
   let _currentUserId = null;
@@ -186,6 +180,7 @@ const WBBackend = (() => {
       tournee_progress: stats.tourneeProgress,
       gallery_entries: stats.galleryEntries,
       trophy_best_score: stats.trophyBestScore,
+      pvp_elo: stats.pvpElo,
       updated_at: new Date().toISOString(),
     });
     if (error) console.error('[WBBackend] saveLeaderboardStats:', error);
@@ -206,11 +201,55 @@ const WBBackend = (() => {
     return data || [];
   }
 
+  // ─── PVP (équipes de défense publiques, matchmaking aléatoire) ───────────────
+
+  /** Publie/actualise son équipe de défense PvP (stats déjà calculées, ELO, victoires/défaites) */
+  async function savePvpDefenseTeam(userId, displayName, teamSnapshot, elo, wins, losses) {
+    const { error } = await _client.from('pvp_defense_teams').upsert({
+      user_id: userId,
+      display_name: displayName,
+      team_snapshot: teamSnapshot,
+      elo, wins, losses,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) console.error('[WBBackend] savePvpDefenseTeam:', error);
+  }
+
+  /**
+   * Tire un adversaire PvP au hasard parmi les joueurs ayant publié une équipe
+   * de défense (jamais soi-même). Retourne null si aucun adversaire disponible.
+   * @param {string} excludeUserId
+   */
+  async function loadRandomPvpOpponent(excludeUserId) {
+    // On récupère un lot (jusqu'à 50) puis on tire au hasard côté client —
+    // Supabase ne propose pas nativement un "ORDER BY random()" simple à filtrer.
+    const { data, error } = await _client
+      .from('pvp_defense_teams')
+      .select('user_id, display_name, team_snapshot, elo, wins, losses')
+      .neq('user_id', excludeUserId)
+      .limit(50);
+    if (error) { console.error('[WBBackend] loadRandomPvpOpponent:', error); return null; }
+    if (!data || data.length === 0) return null;
+    return data[Math.floor(Math.random() * data.length)];
+  }
+
+  /** Charge une petite liste d'adversaires PvP potentiels (pour l'animation de roulette) */
+  async function loadPvpOpponentPool(excludeUserId, limit = 12) {
+    const { data, error } = await _client
+      .from('pvp_defense_teams')
+      .select('user_id, display_name, elo, team_snapshot')
+      .neq('user_id', excludeUserId)
+      .limit(limit);
+    if (error) { console.error('[WBBackend] loadPvpOpponentPool:', error); return []; }
+    return data || [];
+  }
+
   return {
     init, getSession, signUp, signIn, signOut,
     loadGameData, saveGameData, loadPlayerSave, savePlayerData,
     isCurrentUserAdmin, setCurrentUserId, getCurrentUserId, storageClient,
     loadAllProfiles, loadAllPlayerSaves, loadBackupDates, restorePlayerFromBackup,
     saveLeaderboardStats, loadLeaderboard,
+    savePvpDefenseTeam, loadRandomPvpOpponent, loadPvpOpponentPool,
   };
 })();
