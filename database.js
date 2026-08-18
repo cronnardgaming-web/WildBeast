@@ -68,6 +68,31 @@ const WBGameDatabase = (() => {
           { id: 'trophy_tier_4', score: 20000, reward: { type: 'crystals', amount: 300  } },
         ],
       },
+      // ── Duel à Distance (PvP asynchrone) ─────────────────────────────────
+      // Combat contre l'équipe de défense publiée par un autre joueur, choisi
+      // au hasard. Niveau de TOUS les combattants fixé à 50 pour ce combat
+      // uniquement (équipement/bonus stats conservés) ; aucun XP/Or/Essence
+      // Sauvage gagné — uniquement de l'Instinct Primaire (monnaie dédiée) et
+      // une variation d'ELO selon le résultat.
+      pvp: {
+        staminaMax:           10,   // Stamina PvP maximum (ressource dédiée, distincte de l'énergie)
+        staminaRegenMinutes:  180,  // 1 point de stamina régénéré toutes les X minutes
+        staminaCostPerDuel:   1,    // Coût en stamina par duel lancé
+        combatLevel:          50,   // Niveau imposé à toutes les créatures pendant CE combat uniquement
+        eloStarting:          1000, // ELO de départ pour un nouveau joueur
+        eloKFactor:           24,   // Sensibilité du calcul ELO (plus haut = plus de points en jeu par duel)
+        currencyName:         'Instinct Primaire',
+        rewardPerWin:         15,   // 🩸 Instinct Primaire gagné par victoire
+        // Paliers de récompense personnels selon le nombre de VICTOIRES cumulées
+        // (nombre libre, triés du plus petit au plus grand). Chaque palier
+        // n'est débloqué qu'une seule fois.
+        rewardTiers: [
+          { id: 'pvp_tier_1', wins: 5,  reward: { type: 'gold',     amount: 400  } },
+          { id: 'pvp_tier_2', wins: 15, reward: { type: 'crystals', amount: 150  } },
+          { id: 'pvp_tier_3', wins: 30, reward: { type: 'crystals', amount: 400  } },
+          { id: 'pvp_tier_4', wins: 50, reward: { type: 'gold',     amount: 2000 } },
+        ],
+      },
       // ── Mode Odyssée (histoire) ────────────────────────────────────────────
       story: {
         subLevelsPerWorld:   25,    // Nombre de sous-niveaux par monde
@@ -254,6 +279,7 @@ const WBGameDatabase = (() => {
       tourneeProgress: { every: 25,  label: 'Sous-niveaux Tournée complétés' },
       galleryEntries:  { every: 10,  label: 'Entrées débloquées (Encyclopédie)' },
       trophyBestScore: { every: 5000, label: 'Meilleur score à la Traque' },
+      pvpWins:         { every: 10,   label: 'Victoires en Duel PvP' },
     },
   };
 
@@ -757,6 +783,14 @@ const WBGameDatabase = (() => {
       tiersReached: [],       // IDs des paliers de récompense déjà débloqués (une seule fois chacun)
     },
     permanentQuestsClaimed: [], // IDs des paliers de quêtes Permanentes déjà réclamés (une seule fois chacun)
+    pvp: {                  // Progression Duel à Distance (PvP asynchrone)
+      stamina: { current: 10, max: 10, lastRegen: Date.now() }, // ressource dédiée, distincte de l'énergie
+      elo: 1000,
+      currency: 0,           // 🩸 Instinct Primaire
+      defenseTeam: null,     // Tableau d'instanceId choisi par le joueur, ou null = utilise l'équipe active du moment
+      tiersReached: [],      // IDs des paliers de récompense (victoires cumulées) déjà réclamés
+      history: [],           // 5 derniers duels : { opponentName, won, eloChange, timestamp }
+    },
     dailyLogin: {           // Progression des cycles de récompense de connexion quotidienne
       progress: {},         // { [cycleId]: { currentDay: 1, lastClaimDate: 'YYYY-MM-DD'|null } }
     },
@@ -787,6 +821,9 @@ const WBGameDatabase = (() => {
       totalCrystalsSpent:  0,// diamants totaux dépensés
       longestWinStreak: 0,   // plus longue série de victoires
       currentWinStreak: 0,   // série en cours
+      totalPvpBattles:  0,   // duels PvP livrés
+      totalPvpWins:     0,   // duels PvP gagnés
+      totalPvpLosses:   0,   // duels PvP perdus
       favoriteCharId:   null,// perso le plus utilisé (id)
       playTimeMinutes:  0,   // temps de jeu estimé (minutes)
       playtime: 0,
@@ -857,6 +894,11 @@ const WBGameDatabase = (() => {
     { id: 'shop_1781970094272', kind: 'equipment', refId: 'ArmureC', price: 100, currency: 'gold', enabled: true },
     { id: 'shop_1781970134789', kind: 'item', refId: 'item_power_pill', price: 100, currency: 'crystals', enabled: true },
   ];
+
+  // ─── COMPTOIR DU DUEL (boutique PvP, prix en 🩸 Instinct Primaire) ─────────────
+  // Même structure que DEFAULT_SHOP_LISTINGS (kind/refId/price/enabled) mais la
+  // monnaie est toujours l'Instinct Primaire — pas de champ "currency" à régler.
+  const DEFAULT_PVP_SHOP_LISTINGS = [];
 
   // ─── RÉCOMPENSE DE CONNEXION QUOTIDIENNE ────────────────────────────────────────
   // Aucun cycle par défaut : l'administrateur en crée autant qu'il le souhaite
@@ -1026,11 +1068,13 @@ const WBGameDatabase = (() => {
     QUEST_TYPES,
     DEFAULT_DAILY_QUESTS,
     DEFAULT_WEEKLY_QUESTS,
+    DEFAULT_PERMANENT_QUESTS,
     DEFAULT_TAG_CATEGORIES,
     DEFAULT_TAGS,
     PASSIVE_EFFECT_TYPES,
     DEFAULT_PASSIVES,
     DEFAULT_EQUIP_BANNERS,
+    DEFAULT_PVP_SHOP_LISTINGS,
     DEFAULT_EVENT_QUEST_TEMPLATES, DEFAULT_EVENT_COMBAT_CONFIG, DEFAULT_EVENT_LOGIN_CYCLE,
     DEFAULT_PLAYER,
     FUTURE_STUBS,
