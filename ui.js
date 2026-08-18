@@ -2729,10 +2729,12 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       if (!def) return '';
       const selected = inTeam.has(inst.instanceId);
       return `
-        <div class="char-card ${selected ? 'selected-for-team' : ''}" data-instance-id="${inst.instanceId}">
-          <div class="char-card-portrait">${_portraitImgHtml(def)}</div>
-          <div class="char-card-name">${def.name}</div>
-          <div class="char-card-level">Niv. ${inst.level}</div>
+        <div class="char-card" data-instance-id="${inst.instanceId}" ${selected ? 'style="opacity:.6;box-shadow:0 0 0 2px var(--accent)"' : ''}>
+          <div class="card-portrait">${_portraitImgHtml(def)}</div>
+          <div class="card-info">
+            <div class="card-name">${def.name}</div>
+            <div class="card-level">Niv. ${inst.level}</div>
+          </div>
         </div>`;
     }).join('');
     grid.querySelectorAll('.char-card').forEach(card => {
