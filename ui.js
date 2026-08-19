@@ -31,7 +31,7 @@ const WBGameUI = (() => {
 
   // Onglet d'équipement actif dans l'écran Équiper, et tri/filtre par onglet
   let _equipInvTab = 'weapon';
-  let _equipInvSort = { weapon: 'name', armor: 'name', accessory: 'name' };
+  let _equipInvSort = { weapon: 'rarity', armor: 'rarity', accessory: 'rarity' };
   let _equipInvFilters = {
     weapon:    { search: '', rarity: '', statKey: 'atk', statMin: '' },
     armor:     { search: '', rarity: '', statKey: 'def', statMin: '' },
