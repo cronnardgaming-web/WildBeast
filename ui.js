@@ -2849,6 +2849,8 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   let _liveDuelSuspendTimer = null;
 
   let _liveDuelLastLogLength = 0;
+  let _liveDuelEventsSinceMyTurn = []; // tous les événements depuis la dernière attaque de l'invité
+  let _liveDuelBannerSafetyTimer = null;
 
   /** Écran de recherche d'adversaire pour le Duel en Direct */
   function renderDuelLiveQueue() {
@@ -2997,6 +2999,18 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       });
     }
 
+    if (event === 'playerTurn') {
+      // C'est mon propre tour (côté hôte) — même minuteur de 20s
+      _startLiveDuelTurnTimer(20, (auto) => {
+        if (!_battle || _battle.phase !== 'player') return;
+        const actor = _battle.playerTeam.find(c => c.instanceId === data.actor.instanceId && c.alive);
+        if (!actor) return;
+        const targets = _battle.enemyTeam.filter(c => c.alive);
+        const best = WBCombatEngine._aiChooseTarget(actor, targets);
+        if (best) WBCombatEngine.playerAttack(actor.instanceId, best.instanceId);
+      });
+    }
+
     if (['playerAttack', 'enemyAttack', 'roundStart', 'playerTurn', 'awaitingRemoteAction'].includes(event) && _liveDuelId) {
       WBBackend.updatePvpLiveDuel(_liveDuelId, { battle_state: _serializeLiveBattle(_battle) });
     }
@@ -3061,6 +3075,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   /** Côté invité : ne fait PAS tourner le moteur — reçoit l'état de l'hôte et affiche une vue simplifiée */
   function _startLiveDuelAsGuest(duelId, opponent) {
     _liveDuelLastLogLength = 0;
+    _liveDuelEventsSinceMyTurn = [];
     showScreen('combat');
     _combatInProgress = true;
     document.body.classList.add('battle-active');
@@ -3127,22 +3142,27 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     const logEl = document.getElementById('guest-battle-log');
     if (logEl) logEl.innerHTML = (remote.log || []).slice(-8).map(l => `<div class="log-line">${l}</div>`).join('');
 
-    // Retour visuel minimal (pas d'animation complète comme côté hôte) : à
-    // chaque nouvelle ligne de journal, une bannière apparaît brièvement au
-    // centre de l'écran, pour au moins signaler que quelque chose vient de
-    // se produire (dégâts, passif, esquive...).
+    // Retour visuel minimal (pas d'animation complète comme côté hôte) : la
+    // bannière accumule TOUS les événements survenus depuis la dernière
+    // attaque de l'invité (vidée dans _submitGuestAction), et reste affichée
+    // jusqu'au prochain événement — 20s en filet de sécurité seulement, si
+    // jamais plus rien ne vient la remplacer.
     const fullLog = remote.log || [];
     if (fullLog.length > _liveDuelLastLogLength) {
       const newLines = fullLog.slice(_liveDuelLastLogLength);
       _liveDuelLastLogLength = fullLog.length;
+      _liveDuelEventsSinceMyTurn.push(...newLines);
+
       const banner = document.getElementById('duel-live-event-banner');
-      if (banner && newLines.length > 0) {
-        banner.textContent = newLines[newLines.length - 1];
+      if (banner && _liveDuelEventsSinceMyTurn.length > 0) {
+        banner.innerHTML = _liveDuelEventsSinceMyTurn.map(l => `<div>${l}</div>`).join('');
         banner.style.display = 'flex';
         banner.classList.remove('duel-live-event-banner-pop');
-        void banner.offsetWidth; // force le redémarrage de l'animation même si le texte est identique
+        void banner.offsetWidth; // force le redémarrage de l'animation même si le contenu est identique
         banner.classList.add('duel-live-event-banner-pop');
-        setTimeout(() => { banner.style.display = 'none'; }, 1600);
+
+        if (_liveDuelBannerSafetyTimer) clearTimeout(_liveDuelBannerSafetyTimer);
+        _liveDuelBannerSafetyTimer = setTimeout(() => { banner.style.display = 'none'; }, 20000);
       }
     }
 
@@ -3181,6 +3201,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   /** Envoie le choix de cible de l'invité vers le salon, pour que l'hôte le résolve */
   async function _submitGuestAction(attackerId, targetId) {
     _stopLiveDuelTurnTimer();
+    _liveDuelEventsSinceMyTurn = []; // repart de zéro : la prochaine bannière ne montrera que ce qui se passe APRÈS cette attaque
     if (!_liveDuelId) return;
     const row = await WBBackend.loadPvpLiveDuel(_liveDuelId);
     if (!row) return;

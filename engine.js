@@ -186,11 +186,11 @@ const WBCombatEngine = (() => {
     if (!attacker.statusEffects || attacker.statusEffects.length === 0) return;
     if (!_rollChance(garderobe.params.chance)) return;
     attacker.statusEffects = [];
-    _battle.log.push(`👗 ${attacker.name} utilise Garde Robe sur soi-même et retire toutes ses altérations !`);
+    _battle.log.push(`👗 ${attacker.name} utilise Mue sur soi-même et retire toutes ses altérations !`);
     _emit('passiveTriggered', {
       combatantId: attacker.instanceId, isEnemy: attacker.isEnemy,
       passiveId: garderobe.id, passiveName: garderobe.name,
-      message: `${attacker.name} active Garde Robe !`,
+      message: `${attacker.name} active Mue !`,
     });
   }
 
@@ -230,14 +230,14 @@ const WBCombatEngine = (() => {
           o.currentHp = Math.max(0, o.currentHp - dmg);
           if (o.currentHp <= 0) { o.alive = false; o.currentHp = 0; }
         });
-        _battle.log.push(`💥 ${actor.name} utilise Fanatisme sur tous les adversaires (${fanatisme.params.damagePercentMaxHp}% Endurance max) !`);
+        _battle.log.push(`💥 ${actor.name} utilise Tsunami sur tous les adversaires (${fanatisme.params.damagePercentMaxHp}% Vitalité max) !`);
         // Calcul des dégâts par cible (déjà appliqués ci-dessus, recalculés ici pour l'UI)
         const damageMap = {};
         opponents.forEach(o => { damageMap[o.instanceId] = Math.max(1, Math.round(o.maxHp * (fanatisme.params.damagePercentMaxHp / 100))); });
         _emit('passiveTriggered', {
           combatantId: actor.instanceId, isEnemy: actor.isEnemy,
           passiveId: fanatisme.id, passiveName: fanatisme.name,
-          message: `${actor.name} active Fanatisme !`,
+          message: `${actor.name} active Tsunami !`,
           extra: { targetIds: opponents.map(o => o.instanceId), damageMap },
         });
         if (_battle.mode === 'trophy' && !actor.isEnemy) {
@@ -261,11 +261,11 @@ const WBCombatEngine = (() => {
         : actor;
       chosen.tempAtkBuffPercent = (chosen.tempAtkBuffPercent || 0) + ardente.params.percent;
       const target = chosen.instanceId === actor.instanceId ? 'soi-même' : chosen.name;
-      _battle.log.push(`🔥 ${actor.name} utilise Ardente sur ${target} : Charisme +${ardente.params.percent}% pour la prochaine attaque !`);
+      _battle.log.push(`🔥 ${actor.name} utilise Meute sur ${target} : Puissance +${ardente.params.percent}% pour la prochaine attaque !`);
       _emit('passiveTriggered', {
         combatantId: actor.instanceId, isEnemy: actor.isEnemy,
         passiveId: ardente.id, passiveName: ardente.name,
-        message: `${actor.name} utilise Ardente !`,
+        message: `${actor.name} utilise Meute !`,
         extra: { buffedId: chosen.instanceId },
       });
     }
@@ -281,7 +281,7 @@ const WBCombatEngine = (() => {
           const healHpBefore = lowest.currentHp;
           lowest.currentHp = Math.min(lowest.maxHp, lowest.currentHp + heal);
           const healHpAfter  = lowest.currentHp;
-          _battle.log.push(`💚 ${actor.name} utilise Régénération sur ${lowest.name} : +${heal} Endurance !`);
+          _battle.log.push(`💚 ${actor.name} utilise Régénération sur ${lowest.name} : +${heal} Vitalité !`);
           _emit('passiveTriggered', {
             combatantId: actor.instanceId, isEnemy: actor.isEnemy,
             passiveId: regen.id, passiveName: regen.name,
@@ -1481,11 +1481,11 @@ const WBCombatEngine = (() => {
       const presence = _findPassive(attacker, 'on_hit_paralyze');
       if (presence && !_hasStatus(target, 'paralysis') && _rollChance(presence.params.chance)) {
         _applyStatus(target, 'paralysis', {});
-        _battle.log.push(`✨ ${attacker.name} utilise Présence sur ${target.name} : paralysie !`);
+        _battle.log.push(`✨ ${attacker.name} utilise Paralysie sur ${target.name} : paralysie !`);
         _emit('passiveTriggered', {
           combatantId: attacker.instanceId, isEnemy: attacker.isEnemy,
           passiveId: presence.id, passiveName: presence.name,
-          message: `${attacker.name} utilise Présence !`,
+          message: `${attacker.name} utilise Paralysie !`,
           extra: { statusType: 'paralysis', targetId: target.instanceId },
         });
       }
@@ -1496,11 +1496,11 @@ const WBCombatEngine = (() => {
           turnsLeft: caracterielle.params.duration,
           damagePercentMaxHp: caracterielle.params.damagePercentMaxHp,
         });
-        _battle.log.push(`☠️ ${attacker.name} utilise Caractérielle sur ${target.name} : empoisonnement !`);
+        _battle.log.push(`☠️ ${attacker.name} utilise Venin sur ${target.name} : empoisonnement !`);
         _emit('passiveTriggered', {
           combatantId: attacker.instanceId, isEnemy: attacker.isEnemy,
           passiveId: caracterielle.id, passiveName: caracterielle.name,
-          message: `${attacker.name} utilise Caractérielle !`,
+          message: `${attacker.name} utilise Venin !`,
           extra: { statusType: 'poison', targetId: target.instanceId },
         });
       }

@@ -3536,13 +3536,14 @@
 
   /* Bannière d'événement — retour visuel minimal côté invité (Duel en Direct) */
   .duel-live-event-banner{
-    align-items:center; justify-content:center; text-align:center;
-    margin:0 auto 10px; max-width:90%;
+    flex-direction:column; align-items:center; justify-content:center; text-align:center;
+    margin:0 auto 10px; max-width:90%; max-height:140px; overflow-y:auto;
     background:var(--surface); border:1.5px solid var(--accent);
     border-radius:var(--radius); padding:8px 16px;
     font-size:.8rem; font-weight:700; color:#F5EAD3;
     box-shadow:0 4px 14px -4px var(--gold-glow);
   }
+  .duel-live-event-banner > div{ padding:2px 0; }
   .duel-live-event-banner-pop{ animation:duelEventPop .4s ease-out; }
   @keyframes duelEventPop{ from{ transform:scale(.85); opacity:0; } to{ transform:scale(1); opacity:1; } }
 
