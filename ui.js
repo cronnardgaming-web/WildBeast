@@ -3437,8 +3437,11 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     // Pour chaque type, calculer combien de lignées DISTINCTES le joueur a débloquées
     // (au moins 1 personnage de la lignée dans le catalogue, ayant ce type en type1 ou type2)
     const ARENA_REQUIRED_LINES = 6;
+    const ARENA_EXCLUDED_TYPES = ['préhistorique', 'cryptide']; // aucun territoire pour ces types
 
-    const typeUnlockData = state.types.map(t => {
+    const typeUnlockData = state.types
+      .filter(t => !ARENA_EXCLUDED_TYPES.includes((t.name || '').toLowerCase()))
+      .map(t => {
       // Trouver toutes les lignées qui ont au moins un membre avec ce type
       const linesWithType = new Set();
       state.characters.forEach(c => {
