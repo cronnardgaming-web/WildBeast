@@ -3301,6 +3301,39 @@
   .equip-inv-card.rarity-legendary{ border-color:var(--r-legendary); }
   .equip-inv-name{ font-weight:800; font-size:.78rem; }
   .equip-inv-bonuses{ font-size:.64rem; color:var(--text-dim); font-family:var(--font-mono); margin-top:5px; }
+
+  /* ── Inventaire équipement : structure liste (gauche) / détail par niveau (droite) ── */
+  .equip-inv-master-detail{
+    display:flex; gap:10px; align-items:flex-start;
+    min-height:200px;
+  }
+  .equip-inv-names-col{
+    flex:0 0 40%; max-width:40%;
+    display:flex; flex-direction:column; gap:6px;
+    max-height:60vh; overflow-y:auto;
+  }
+  .equip-inv-name-row{
+    background:var(--surface-2); border:1.5px solid var(--border);
+    border-radius:var(--radius-sm); padding:8px 10px; cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .equip-inv-name-row:hover{ border-color:var(--accent2); }
+  .equip-inv-name-row.active{ border-color:var(--accent); background:var(--surface); box-shadow:0 0 0 1px var(--accent); }
+  .equip-inv-name-row.rarity-uncommon { border-left:4px solid var(--r-uncommon); }
+  .equip-inv-name-row.rarity-rare     { border-left:4px solid var(--r-rare);     }
+  .equip-inv-name-row.rarity-epic     { border-left:4px solid var(--r-epic);     }
+  .equip-inv-name-row.rarity-legendary{ border-left:4px solid var(--r-legendary); }
+  .equip-inv-name-row.rarity-mythic   { border-left:4px solid var(--r-mythic); }
+  .equip-inv-name-row-name{ font-weight:800; font-size:.76rem; }
+  .equip-inv-name-row-count{ font-size:.66rem; color:var(--text-dim); font-family:var(--font-mono); margin-top:2px; }
+  .equip-inv-name-row-equipped{ color:var(--accent2); }
+
+  .equip-inv-levels-col{ flex:1 1 60%; min-width:0; }
+  .equip-inv-levels-header{ font-weight:800; font-size:.85rem; margin-bottom:8px; }
+  .equip-inv-levels-grid{ display:flex; flex-direction:column; gap:8px; }
+  .equip-inv-level-header{ font-weight:800; font-size:.72rem; color:var(--accent); font-family:var(--font-mono); }
+  .equip-inv-owned-equipped{ font-size:.62rem; color:var(--text-dim); margin-top:4px; }
+
   .equip-inv-slot-badge{
     display:inline-block; font-size:.6rem; color:var(--text-faint);
     background:var(--surface-3); border-radius:6px; padding:2px 6px;

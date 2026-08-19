@@ -38,6 +38,7 @@ const WBGameUI = (() => {
     accessory: { search: '', rarity: '', statKey: 'hp',  statMin: '' },
   };
   let _equipUnequippedFilter = { weapon: false, armor: false, accessory: false }; // filtres "sans équipement" indépendants par catégorie
+  let _equipInvSelectedName = { weapon: null, armor: null, accessory: null }; // equipId sélectionné dans la colonne de gauche
 
   const RARITY_ORDER  = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
   const STAT_OPTIONS  = [
@@ -50,7 +51,7 @@ const WBGameUI = (() => {
 
   // Slots d'équipement : 3 emplacements fixes, dans l'ordre des index 0/1/2
   const EQUIP_SLOT_ORDER  = WBGameDatabase.EQUIP_SLOTS || ['weapon', 'armor', 'accessory'];
-  const EQUIP_SLOT_LABELS = { weapon: '⚔️ Arme', armor: '👗 Tenue', accessory: '💍 Bijou' };
+  const EQUIP_SLOT_LABELS = { weapon: '⚔️ Arme', armor: '🛡️ Protection', accessory: '🍀 Charme' };
   // Icône seule par catégorie d'équipement — alignée sur les catégories de l'admin
   // (épées croisées / bouclier / bague), utilisée partout où un équipement doit
   // afficher un symbole automatique (ex: vignette dans le Shop).
@@ -2106,11 +2107,24 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     };
   }
 
+  const STAT_EMOJI = { hp: '💗', atk: '💪', def: '🛡️', spd: '🐆' };
+  const STAT_TITLE = { hp: 'Vitalité', atk: 'Puissance', def: 'Résistance', spd: 'Agilité' };
+
+  /** Version compacte sur une ligne (contextes serrés : détail personnage, slot ouvert...) */
   function _formatEquipBonuses(bonuses) {
     return Object.entries(bonuses)
       .filter(([,v]) => v !== 0)
-      .map(([k,v]) => `${k.toUpperCase()}+${v}`)
+      .map(([k,v]) => `${STAT_EMOJI[k] || k.toUpperCase()}${v > 0 ? '+' : ''}${v}`)
       .join(' ');
+  }
+
+  /** Version en grille 2 colonnes, comme les cartes de collection (.card-stats-mini) */
+  function _formatEquipBonusesGrid(bonuses) {
+    const entries = Object.entries(bonuses).filter(([,v]) => v !== 0);
+    if (entries.length === 0) return '';
+    return `<div class="card-stats-mini">${entries.map(([k,v]) =>
+      `<span title="${STAT_TITLE[k] || k}">${STAT_EMOJI[k] || k.toUpperCase()} ${v > 0 ? '+' : ''}${v}</span>`
+    ).join('')}</div>`;
   }
 
   /**
@@ -5681,7 +5695,10 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
         ${_renderEquipSortSelect('equip-inv-sort', _equipInvSort[_equipInvTab])}
       </div>
       ${_renderEquipFilterBar('equip-inv', _equipInvFilters[_equipInvTab])}
-      <div class="equip-inv-grid" id="equip-inv-grid"></div>
+      <div class="equip-inv-master-detail">
+        <div class="equip-inv-names-col" id="equip-inv-names-col"></div>
+        <div class="equip-inv-levels-col" id="equip-inv-levels-col"></div>
+      </div>
     `;
   }
 
@@ -5922,13 +5939,14 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   /** Trie une liste décorée d'exemplaires d'équipement ({invInst, def}) */
   function _sortEquipInv(decorated, sortKey) {
     const rarityIndex = (r) => { const idx = RARITY_ORDER.indexOf(r); return idx === -1 ? 0 : idx; };
+    const statOf = ({ def, invInst }, key) => _scaledEquipBonuses(def, invInst)[key] || 0;
     const sorted = [...decorated];
     switch (sortKey) {
       case 'rarity': sorted.sort((a, b) => rarityIndex(b.def.rarity) - rarityIndex(a.def.rarity) || a.def.name.localeCompare(b.def.name)); break;
-      case 'hp':     sorted.sort((a, b) => (b.def.bonuses.hp  || 0) - (a.def.bonuses.hp  || 0)); break;
-      case 'atk':    sorted.sort((a, b) => (b.def.bonuses.atk || 0) - (a.def.bonuses.atk || 0)); break;
-      case 'def':    sorted.sort((a, b) => (b.def.bonuses.def || 0) - (a.def.bonuses.def || 0)); break;
-      case 'spd':    sorted.sort((a, b) => (b.def.bonuses.spd || 0) - (a.def.bonuses.spd || 0)); break;
+      case 'hp':     sorted.sort((a, b) => statOf(b, 'hp')  - statOf(a, 'hp')); break;
+      case 'atk':    sorted.sort((a, b) => statOf(b, 'atk') - statOf(a, 'atk')); break;
+      case 'def':    sorted.sort((a, b) => statOf(b, 'def') - statOf(a, 'def')); break;
+      case 'spd':    sorted.sort((a, b) => statOf(b, 'spd') - statOf(a, 'spd')); break;
       case 'name':
       default:       sorted.sort((a, b) => a.def.name.localeCompare(b.def.name)); break;
     }
@@ -5938,11 +5956,11 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   /** Filtre une liste décorée d'exemplaires d'équipement selon la recherche, la rareté et un seuil de stat */
   function _applyEquipFilters(decorated, filters) {
     if (!filters) return decorated;
-    return decorated.filter(({ def }) => {
+    return decorated.filter(({ def, invInst }) => {
       if (filters.search && !def.name.toLowerCase().includes(filters.search.toLowerCase())) return false;
       if (filters.rarity && def.rarity !== filters.rarity) return false;
       if (filters.statKey && filters.statMin !== '' && filters.statMin != null) {
-        const val = def.bonuses[filters.statKey] || 0;
+        const val = _scaledEquipBonuses(def, invInst)[filters.statKey] || 0;
         if (val < Number(filters.statMin)) return false;
       }
       return true;
@@ -6034,68 +6052,130 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
    */
   function _refreshEquipInvGrid() {
     const state = WBGameState.get();
-    const grid = document.getElementById('equip-inv-grid');
-    if (!grid) return;
+    const namesCol  = document.getElementById('equip-inv-names-col');
+    const levelsCol = document.getElementById('equip-inv-levels-col');
+    if (!namesCol || !levelsCol) return;
 
-    const inv = state.player.equipInventory || [];
-    const decoratedAll = inv.map(invInst => {
+    const decoratedAll = (state.player.equipInventory || []).map(invInst => {
       const def = state.equipment.find(e => e.id === invInst.equipId);
       if (!def) return null;
       return { invInst, def };
     }).filter(Boolean).filter(({ def }) => WBGameDatabase.resolveEquipSlot(def) === _equipInvTab);
 
-    const grouped  = _groupEquipStacks(decoratedAll);
-    const filtered = _applyEquipFilters(grouped, _equipInvFilters[_equipInvTab]);
-    const sorted   = _sortEquipInv(filtered, _equipInvSort[_equipInvTab]);
+    const filteredAll = _applyEquipFilters(decoratedAll, _equipInvFilters[_equipInvTab]);
 
-    if (sorted.length === 0) {
-      grid.innerHTML = `<p class="empty-msg" style="margin:0;padding:.8rem">${decoratedAll.length === 0 ? `Aucun ${EQUIP_SLOT_LABELS[_equipInvTab].replace(/^\S+\s/, '').toLowerCase()} en stock.<br>Utilisez le Défilé d'Équipements !` : 'Aucun équipement ne correspond aux filtres.'}</p>`;
+    // Colonne de gauche : un nom d'équipement = tous ses niveaux confondus regroupés
+    const byName = {};
+    filteredAll.forEach(({ invInst, def }) => {
+      if (!byName[def.id]) byName[def.id] = { def, instances: [] };
+      byName[def.id].instances.push(invInst);
+    });
+    let nameGroups = Object.values(byName);
+
+    // Trier les noms selon le meilleur exemplaire possédé pour ce nom (vraies stats ajustées par niveau)
+    nameGroups = _sortEquipInv(
+      nameGroups.map(g => {
+        const best = [...g.instances].sort((a, b) => (b.level ?? 999) - (a.level ?? 999))[0];
+        return { def: g.def, invInst: best, _group: g };
+      }),
+      _equipInvSort[_equipInvTab]
+    ).map(x => x._group);
+
+    if (nameGroups.length === 0) {
+      namesCol.innerHTML = `<p class="empty-msg" style="margin:0;padding:.8rem">${decoratedAll.length === 0 ? `Aucun ${EQUIP_SLOT_LABELS[_equipInvTab].replace(/^\S+\s/, '').toLowerCase()} en stock.<br>Utilisez le Défilé d'Équipements !` : 'Aucun équipement ne correspond aux filtres.'}</p>`;
+      levelsCol.innerHTML = '';
       return;
     }
 
-    // Le slot ouvert (le cas échéant) correspond-il à l'onglet inventaire actif ?
-    // Si oui, la grille devient cliquable pour équiper directement, avec mise en
-    // évidence des améliorations par rapport à l'équipement actuel.
+    // Si le nom sélectionné n'est plus dans la liste filtrée (changement d'onglet/filtre), on retombe sur le premier
+    let selectedId = _equipInvSelectedName[_equipInvTab];
+    if (!selectedId || !nameGroups.some(g => g.def.id === selectedId)) {
+      selectedId = nameGroups[0].def.id;
+      _equipInvSelectedName[_equipInvTab] = selectedId;
+    }
+
+    namesCol.innerHTML = nameGroups.map(g => {
+      const totalOwned    = g.instances.length;
+      const totalEquipped = g.instances.filter(i => i.equippedBy).length;
+      const active = g.def.id === selectedId;
+      return `
+        <div class="equip-inv-name-row rarity-${g.def.rarity} ${active ? 'active' : ''}" data-equip-id="${g.def.id}">
+          <div class="equip-inv-name-row-name">${g.def.name}</div>
+          <div class="equip-inv-name-row-count">×${totalOwned}${totalEquipped ? ` <span class="equip-inv-name-row-equipped">(${totalEquipped} équipé${totalEquipped > 1 ? 's' : ''})</span>` : ''}</div>
+        </div>`;
+    }).join('');
+
+    namesCol.querySelectorAll('.equip-inv-name-row').forEach(row => {
+      row.addEventListener('click', () => {
+        _equipInvSelectedName[_equipInvTab] = row.dataset.equipId;
+        _refreshEquipInvGrid();
+      });
+    });
+
+    const selectedGroup = nameGroups.find(g => g.def.id === selectedId);
+    _renderEquipInvLevelsCol(levelsCol, selectedGroup);
+  }
+
+  /** Colonne de droite : tous les niveaux possédés d'un équipement précis, du plus haut au plus bas */
+  function _renderEquipInvLevelsCol(container, group) {
+    if (!group) { container.innerHTML = ''; return; }
+    const { def, instances } = group;
+    const state = WBGameState.get();
+
+    // Regrouper par niveau exact (les Mythiques n'ont pas de niveau : regroupés à part, toujours en tête)
+    const byLevel = {};
+    instances.forEach(inst => {
+      const key = inst.level == null ? 'mythic' : String(inst.level);
+      if (!byLevel[key]) byLevel[key] = [];
+      byLevel[key].push(inst);
+    });
+    const levelKeys = Object.keys(byLevel).sort((a, b) => {
+      if (a === 'mythic') return -1;
+      if (b === 'mythic') return 1;
+      return Number(b) - Number(a); // du plus haut niveau au plus bas
+    });
+
     const inst = _equipCharId ? WBGameState.getPlayerChar(_equipCharId) : null;
     const slotMatchesOpenSlot = !!(inst && _equipSlotOpen !== null && EQUIP_SLOT_ORDER[_equipSlotOpen] === _equipInvTab);
-    let currentDef = null;
-    let currentEntry = null;
+    let currentDef = null, currentEntry = null;
     if (slotMatchesOpenSlot) {
       const currentInvId = inst.equipment?.[_equipSlotOpen] || null;
       currentEntry = currentInvId ? state.player.equipInventory.find(ei => ei.instanceId === currentInvId) : null;
       currentDef = currentEntry ? state.equipment.find(e => e.id === currentEntry.equipId) : null;
     }
 
-    grid.innerHTML = sorted.map(({ invInst, def, count, stacked }) => {
-      const holder = !stacked ? _describeEquippedBy(invInst.equippedBy) : null;
-      const usedElsewhere = !stacked && invInst.equippedBy && invInst.equippedBy !== _equipCharId;
-      const isUpgrade = slotMatchesOpenSlot && !usedElsewhere && (!currentDef || _itemScore(def, invInst) > _itemScore(currentDef, currentEntry));
-      const clickable = slotMatchesOpenSlot && !usedElsewhere;
-      return `
-        <div class="equip-inv-card rarity-${def.rarity} ${isUpgrade ? 'is-upgrade' : ''}"
-             data-inst-id="${invInst.instanceId}" data-equip-id="${def.id}"
-             ${clickable ? 'style="cursor:pointer"' : ''}>
-          ${count > 1 ? `<div class="equip-inv-stack-badge">×${count}</div>` : ''}
-          ${invInst.level != null ? `<div class="equip-inv-level">Niv. ${invInst.level}</div>` : ''}
-          <div class="equip-inv-name">${def.name}</div>
-          <div class="equip-inv-bonuses">${_formatEquipBonuses(_scaledEquipBonuses(def, invInst))}</div>
-          ${isUpgrade ? '<div class="equip-upgrade-hint">⬆ Amélioration</div>' : ''}
-          ${holder ? `
-            <div class="equip-inv-holder" title="Équipé par ${holder.name}">
-              <span class="equip-inv-holder-portrait">${holder.portrait ? `<img src="${holder.portrait}" alt="${holder.name}">` : holder.name.charAt(0)}</span>
-              <span class="equip-inv-holder-name">${holder.name}</span>
-            </div>` : ''}
-        </div>`;
-    }).join('');
+    container.innerHTML = `
+      <div class="equip-inv-levels-header">${def.name}</div>
+      <div class="equip-inv-levels-grid">
+        ${levelKeys.map(key => {
+          const levelInstances = byLevel[key];
+          const repInst        = levelInstances[0];
+          const owned          = levelInstances.length;
+          const equipped       = levelInstances.filter(i => i.equippedBy).length;
+          const availableInst  = levelInstances.find(i => !i.equippedBy || i.equippedBy === _equipCharId);
+          const isUpgrade = slotMatchesOpenSlot && availableInst && (!currentDef || _itemScore(def, repInst) > _itemScore(currentDef, currentEntry));
+          const clickable  = slotMatchesOpenSlot && !!availableInst;
+          return `
+            <div class="equip-inv-card rarity-${def.rarity} ${isUpgrade ? 'is-upgrade' : ''}"
+                 data-inst-id="${availableInst ? availableInst.instanceId : ''}"
+                 ${clickable ? 'style="cursor:pointer"' : ''}>
+              <div class="equip-inv-level-header">${key === 'mythic' ? '✦ Mythique' : `Niv. ${key}`}</div>
+              ${_formatEquipBonusesGrid(_scaledEquipBonuses(def, repInst))}
+              <div class="equip-inv-owned-equipped">Possédé : ${owned} / Équipé : ${equipped}</div>
+              ${isUpgrade ? '<div class="equip-upgrade-hint">⬆ Amélioration</div>' : ''}
+            </div>`;
+        }).join('')}
+      </div>
+    `;
 
     if (slotMatchesOpenSlot) {
-      grid.querySelectorAll('.equip-inv-card').forEach(card => {
-        const entry = inv.find(ei => ei.instanceId === card.dataset.instId);
-        if (entry?.equippedBy && entry.equippedBy !== _equipCharId) return; // utilisé ailleurs : non cliquable
+      container.querySelectorAll('.equip-inv-card[data-inst-id]').forEach(card => {
+        if (!card.dataset.instId) return;
         card.addEventListener('click', () => _equipFromGrid(card.dataset.instId));
       });
     }
   }
+
 
   /** Équipe un exemplaire directement depuis la grille d'inventaire (slot ouvert correspondant) */
   function _equipFromGrid(invInstanceId) {
@@ -6258,7 +6338,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
           ${count > 1 ? `<div class="equip-inv-stack-badge">×${count}</div>` : ''}
           ${invInst.level != null ? `<div class="equip-inv-level">Niv. ${invInst.level}</div>` : ''}
           <div class="equip-inv-name">${def.name}</div>
-          <div class="equip-inv-bonuses">${_formatEquipBonuses(_scaledEquipBonuses(def, invInst))}</div>
+          ${_formatEquipBonusesGrid(_scaledEquipBonuses(def, invInst))}
           ${isCurrent ? '<div style="font-size:.62rem;color:var(--accent);margin-top:4px">Actuellement équipé</div>' : _buildEquipCompareHtml(currentDef, def)}
         </div>`;
     }).join('');
