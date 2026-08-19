@@ -2995,7 +2995,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       });
     }
 
-    if (['playerAttack', 'enemyAttack', 'roundStart', 'playerTurn'].includes(event) && _liveDuelId) {
+    if (['playerAttack', 'enemyAttack', 'roundStart', 'playerTurn', 'awaitingRemoteAction'].includes(event) && _liveDuelId) {
       WBBackend.updatePvpLiveDuel(_liveDuelId, { battle_state: _serializeLiveBattle(_battle) });
     }
 
@@ -3061,6 +3061,8 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     showScreen('combat');
     _combatInProgress = true;
     document.body.classList.add('battle-active');
+    const lobby = document.querySelector('.combat-lobby'); if (lobby) lobby.style.display = 'none';
+    const tabsEl = document.querySelector('.combat-mode-tabs'); if (tabsEl) tabsEl.style.display = 'none';
     const navEl = document.getElementById('main-nav'); if (navEl) navEl.style.display = 'none';
     WBAudioSystem.playCombat();
     _renderLiveDuelGuestShell(opponent);
