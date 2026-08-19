@@ -3982,6 +3982,8 @@
       //    sécurité périodique plus bas qui, sinon, réenverrait tout toutes
       //    les 30s pour CHAQUE joueur connecté, même sans la moindre activité).
       let _lastGameDataJSON   = JSON.stringify(gameData);
+      let _gameDataSaveSeq = 0;
+      let _lastKnownGoodGameData = JSON.parse(JSON.stringify(gameData));
       let _lastPlayerJSON     = JSON.stringify(playerData || {});
       // Compteur de sauvegardes Supabase en cours (jamais négatif). Tant qu'il
       // est > 0, un rechargement/une fermeture de la page perdrait la dernière
@@ -4002,6 +4004,27 @@
        * joueur, puisqu'aucune mécanique normale du jeu ne réduit ces nombres.
        * @returns {string|null} une description du problème, ou null si tout va bien
        */
+      /**
+       * Même principe que _detectSuspiciousPlayerCollapse, mais pour les
+       * données PARTAGÉES du jeu (personnages, chapitres d'histoire,
+       * bannières...) — sauvegardées uniquement par un compte admin.
+       */
+      function _detectSuspiciousGameDataCollapse(prev, next) {
+        if (!prev) return null;
+        const prevChars = (prev.characters || []).length;
+        const nextChars = (next.characters || []).length;
+        const prevChaps = (prev.storyMode?.chapters || []).length;
+        const nextChaps = (next.storyMode?.chapters || []).length;
+        const prevBanners = (prev.banners || []).length;
+        const nextBanners = (next.banners || []).length;
+
+        if (prevChars >= 5 && nextChars === 0) return `Personnages passés de ${prevChars} à 0`;
+        if (prevChars >= 10 && nextChars < prevChars * 0.3) return `Personnages effondrés : ${prevChars} → ${nextChars}`;
+        if (prevChaps > 0 && nextChaps === 0) return `Chapitres du Mode Histoire disparus (${prevChaps} → 0)`;
+        if (prevBanners > 0 && nextBanners === 0) return `Bannières de tirage disparues (${prevBanners} → 0)`;
+        return null;
+      }
+
       function _detectSuspiciousPlayerCollapse(prev, next) {
         if (!prev) return null; // rien à comparer au tout premier chargement
         const prevColl  = (prev.collection || []).length;
@@ -4101,11 +4124,39 @@
         if (isAdmin) {
           const json = JSON.stringify(structural);
           if (json !== _lastGameDataJSON) {
-            _pendingSaveCount++;
-            WBBackend.saveGameData(structural)
-              .then(() => { _lastGameDataJSON = json; })
-              .catch(err => console.error('[Autosave] Données de jeu :', err))
-              .finally(() => { _pendingSaveCount = Math.max(0, _pendingSaveCount - 1); });
+            const problem = _detectSuspiciousGameDataCollapse(_lastKnownGoodGameData, structural);
+            if (problem) {
+              console.error(`[Autosave] 🚨 Sauvegarde des données de jeu BLOQUÉE — anomalie détectée : ${problem}. Rechargement de sécurité en cours...`);
+              _showSafetyBanner('⚠️ Anomalie détectée sur les données de jeu — resynchronisation en cours...');
+              WBBackend.loadGameData().then(fresh => {
+                if (fresh) {
+                  WBGameState.restoreStructuralData(fresh); // ne touche JAMAIS au joueur
+                  _lastKnownGoodGameData = JSON.parse(JSON.stringify(fresh));
+                  _lastGameDataJSON = JSON.stringify(fresh);
+                }
+              });
+            } else {
+              _pendingSaveCount++;
+              const mySeq = ++_gameDataSaveSeq;
+              WBBackend.saveGameData(structural)
+                .then(() => {
+                  if (mySeq === _gameDataSaveSeq) {
+                    _lastGameDataJSON = json;
+                    _lastKnownGoodGameData = JSON.parse(json);
+                  } else {
+                    console.warn('[Autosave] Données de jeu — sauvegarde arrivée en retard, correction immédiate.');
+                    const freshStructural = (({ player, ...rest }) => rest)(WBGameState.get());
+                    WBBackend.saveGameData(freshStructural)
+                      .then(() => {
+                        _lastGameDataJSON = JSON.stringify(freshStructural);
+                        _lastKnownGoodGameData = JSON.parse(JSON.stringify(freshStructural));
+                      })
+                      .catch(err => console.error('[Autosave] Correction données de jeu tardive :', err));
+                  }
+                })
+                .catch(err => console.error('[Autosave] Données de jeu :', err))
+                .finally(() => { _pendingSaveCount = Math.max(0, _pendingSaveCount - 1); });
+            }
           }
         }
       }
