@@ -3114,6 +3114,10 @@ const WBAdminPanel = (() => {
     if (ed) ed.innerHTML = _buildRewardEditorHtml('wquest-reward', null);
   }
 
+  // ── Quêtes quotidiennes ──
+
+  let _questEditingId = null;
+
   function _saveQuest() {
     const type = document.getElementById('quest-type')?.value;
     const name = document.getElementById('quest-name')?.value.trim();
