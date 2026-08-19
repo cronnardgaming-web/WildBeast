@@ -3534,6 +3534,18 @@
   @keyframes duelTimerPulse{ 0%,100%{ opacity:1; } 50%{ opacity:.5; } }
   .battle-target-row{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
 
+  /* Bannière d'événement — retour visuel minimal côté invité (Duel en Direct) */
+  .duel-live-event-banner{
+    align-items:center; justify-content:center; text-align:center;
+    margin:0 auto 10px; max-width:90%;
+    background:var(--surface); border:1.5px solid var(--accent);
+    border-radius:var(--radius); padding:8px 16px;
+    font-size:.8rem; font-weight:700; color:#F5EAD3;
+    box-shadow:0 4px 14px -4px var(--gold-glow);
+  }
+  .duel-live-event-banner-pop{ animation:duelEventPop .4s ease-out; }
+  @keyframes duelEventPop{ from{ transform:scale(.85); opacity:0; } to{ transform:scale(1); opacity:1; } }
+
   /* Popup de réclamation de connexion quotidienne */
   .daily-login-popup{ max-width:380px; }
   .login-cycle-days-popup{ margin:12px 0 16px; flex-wrap:wrap; justify-content:center; }

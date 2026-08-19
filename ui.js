@@ -2848,6 +2848,8 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
   let _liveDuelUnsubscribe = null;
   let _liveDuelSuspendTimer = null;
 
+  let _liveDuelLastLogLength = 0;
+
   /** Écran de recherche d'adversaire pour le Duel en Direct */
   function renderDuelLiveQueue() {
     const el = document.getElementById('screen-duel-live-queue');
@@ -3058,6 +3060,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
 
   /** Côté invité : ne fait PAS tourner le moteur — reçoit l'état de l'hôte et affiche une vue simplifiée */
   function _startLiveDuelAsGuest(duelId, opponent) {
+    _liveDuelLastLogLength = 0;
     showScreen('combat');
     _combatInProgress = true;
     document.body.classList.add('battle-active');
@@ -3079,6 +3082,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     area.style.display = 'block';
     area.innerHTML = `
       <div class="duel-live-timer" id="duel-live-timer" style="display:none"></div>
+      <div class="duel-live-event-banner" id="duel-live-event-banner" style="display:none"></div>
       <div class="battle-scene">
         <div class="battle-side battle-enemy">
           <h3>${_truncateName(opponent.display_name || 'Adversaire')}</h3>
@@ -3123,6 +3127,25 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     const logEl = document.getElementById('guest-battle-log');
     if (logEl) logEl.innerHTML = (remote.log || []).slice(-8).map(l => `<div class="log-line">${l}</div>`).join('');
 
+    // Retour visuel minimal (pas d'animation complète comme côté hôte) : à
+    // chaque nouvelle ligne de journal, une bannière apparaît brièvement au
+    // centre de l'écran, pour au moins signaler que quelque chose vient de
+    // se produire (dégâts, passif, esquive...).
+    const fullLog = remote.log || [];
+    if (fullLog.length > _liveDuelLastLogLength) {
+      const newLines = fullLog.slice(_liveDuelLastLogLength);
+      _liveDuelLastLogLength = fullLog.length;
+      const banner = document.getElementById('duel-live-event-banner');
+      if (banner && newLines.length > 0) {
+        banner.textContent = newLines[newLines.length - 1];
+        banner.style.display = 'flex';
+        banner.classList.remove('duel-live-event-banner-pop');
+        void banner.offsetWidth; // force le redémarrage de l'animation même si le texte est identique
+        banner.classList.add('duel-live-event-banner-pop');
+        setTimeout(() => { banner.style.display = 'none'; }, 1600);
+      }
+    }
+
     const actionsEl = document.getElementById('guest-battle-actions');
     const myTurn = remote.phase === 'enemy' && myFighters.some(c => c.instanceId === remote.currentActor);
     if (myTurn && actionsEl) {
@@ -3130,7 +3153,15 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       actionsEl.innerHTML = `
         <p style="text-align:center;font-size:.8rem;margin-bottom:8px">À toi de jouer avec <strong>${attacker?.name || ''}</strong> !</p>
         <div class="battle-target-row">
-          ${oppFighters.filter(c => c.alive).map(c => `<button class="btn-target" data-target-id="${c.instanceId}">${c.name}</button>`).join('')}
+          ${oppFighters.filter(c => c.alive).map(c => {
+            let multBadge = '';
+            const mult = WBGameDatabase.getBestTypeEffectiveness(attacker.type1, attacker.type2, c.type1, c.type2, WBGameState.get().typeMatrix);
+            if (mult !== 1) {
+              const cls = mult >= 2 ? 'mult-super' : mult === 0 ? 'mult-immune' : mult <= 0.5 ? 'mult-low' : 'mult-mid';
+              multBadge = `<span class="target-mult ${cls}">×${_formatMult(mult)}</span>`;
+            }
+            return `<button class="btn-target" data-target-id="${c.instanceId}">${c.name} (${c.currentHp}💗)${multBadge}</button>`;
+          }).join('')}
         </div>
       `;
       actionsEl.querySelectorAll('.btn-target').forEach(btn => {
