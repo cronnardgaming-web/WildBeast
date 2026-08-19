@@ -2545,7 +2545,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       <div class="screen-header"><h2>📡 Duel à Distance</h2>${_helpBtn('duel')}</div>
       <div class="trophy-hub-screen">
         <div class="trophy-hub-best" style="display:flex;justify-content:space-around;gap:8px;max-width:360px">
-          <div><div class="trophy-hub-best-label">ELO</div><div class="trophy-hub-best-value" style="font-size:1.2rem">${Math.round(pvp.elo ?? 1000)}</div></div>
+          <div><div class="trophy-hub-best-label">ELO</div><div class="trophy-hub-best-value" style="font-size:1.2rem">${Math.round(pvp.eloAsync ?? 1000)}</div></div>
           <div><div class="trophy-hub-best-label">🩸 ${currencyName}</div><div class="trophy-hub-best-value" style="font-size:1.2rem">${pvp.currency || 0}</div></div>
           <div><div class="trophy-hub-best-label">Stamina</div><div class="trophy-hub-best-value" style="font-size:1.2rem">${stamina}/${staminaMax}</div></div>
         </div>
@@ -2596,9 +2596,9 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     el.innerHTML = `
       <div class="screen-header"><h2>🩸 Duel</h2>${_helpBtn('duel')}</div>
       <div class="trophy-hub-screen">
-        <div class="trophy-hub-best">
-          <div class="trophy-hub-best-label">ELO actuel</div>
-          <div class="trophy-hub-best-value">${Math.round(pvp.elo ?? 1000)}</div>
+        <div class="trophy-hub-best" style="display:flex;justify-content:space-around;gap:8px;max-width:360px">
+          <div><div class="trophy-hub-best-label">📡 ELO Distance</div><div class="trophy-hub-best-value" style="font-size:1.2rem">${Math.round(pvp.eloAsync ?? 1000)}</div></div>
+          <div><div class="trophy-hub-best-label">🔴 ELO Direct</div><div class="trophy-hub-best-value" style="font-size:1.2rem">${Math.round(pvp.eloLive ?? 1000)}</div></div>
         </div>
         <button class="trophy-hub-btn trophy-hub-btn-combat" id="btn-duel-async">
           <span class="trophy-hub-btn-icon">📡</span>
@@ -2654,7 +2654,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     try {
       await WBBackend.savePvpDefenseTeam(
         userId, state.player.name || 'Ranger', snapshot,
-        pvp.elo ?? 1000, state.player.stats?.totalPvpWins || 0, state.player.stats?.totalPvpLosses || 0
+        pvp.eloAsync ?? 1000, state.player.stats?.totalPvpWins || 0, state.player.stats?.totalPvpLosses || 0
       );
     } catch (e) { console.error('[Duel] Publication équipe de défense :', e); }
   }
@@ -2881,7 +2881,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     const mySnapshot = _buildPvpSnapshotFromTeam(WBGameState.getTeam().map(i => i.instanceId));
     if (mySnapshot.length === 0) { _showToast('Compose une équipe avant de duel.', 'error'); showScreen('duel-hub'); return; }
 
-    const myElo = state.player.pvp?.elo ?? 1000;
+    const myElo = state.player.pvp?.eloLive ?? 1000;
     const myName = state.player.name || 'Ranger';
     await WBBackend.joinPvpLiveQueue(userId, myName, myElo, mySnapshot);
 
@@ -3103,7 +3103,7 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
       // Du point de vue de l'invité, son équipe est "enemyTeam" dans l'état de l'hôte —
       // il a gagné si le résultat final de l'hôte est 'defeat'.
       const guestWon = remote.result === 'defeat';
-      _showDuelResult({ rewards: { didWin: guestWon, ...WBGameState.registerPvpResult(guestWon, opponent.display_name || 'Ranger', opponent.elo || 1000) } });
+      _showDuelResult({ rewards: { didWin: guestWon, ...WBGameState.registerPvpResult(guestWon, opponent.display_name || 'Ranger', opponent.elo || 1000, true) } });
       return;
     }
 
@@ -6679,7 +6679,8 @@ Le Catalogue affiche aussi les <b>lignées d'évolution</b> — une créature pe
     { col: 'tournee_progress', label: '🌍 Expédition', unit: '🌍 Niv.' },
     { col: 'gallery_entries',  label: '📚 Encyclopédie', unit: '📚' },
     { col: 'trophy_best_score', label: '🎯 Traque', unit: '🎯' },
-    { col: 'pvp_elo',           label: '🩸 Duel',   unit: 'ELO' },
+    { col: 'pvp_elo',           label: '📡 Duel Distance',   unit: 'ELO' },
+    { col: 'pvp_elo_live',      label: '🔴 Duel Direct',     unit: 'ELO' },
   ];
 
   function renderLeaderboard() {

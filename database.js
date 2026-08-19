@@ -783,13 +783,14 @@ const WBGameDatabase = (() => {
       tiersReached: [],       // IDs des paliers de récompense déjà débloqués (une seule fois chacun)
     },
     permanentQuestsClaimed: [], // IDs des paliers de quêtes Permanentes déjà réclamés (une seule fois chacun)
-    pvp: {                  // Progression Duel à Distance (PvP asynchrone)
-      stamina: { current: 10, max: 10, lastRegen: Date.now() }, // ressource dédiée, distincte de l'énergie
-      elo: 1000,
-      currency: 0,           // 🩸 Instinct Primaire
+    pvp: {                  // Progression Duel (asynchrone + direct — ressources partagées, ELO distincts)
+      stamina: { current: 10, max: 10, lastRegen: Date.now() }, // ressource dédiée, partagée entre les 2 modes
+      eloAsync: 1000,         // ELO du Duel à Distance
+      eloLive: 1000,          // ELO du Duel en Direct — classement séparé
+      currency: 0,           // 🩸 Instinct Primaire, partagé entre les 2 modes
       defenseTeam: null,     // Tableau d'instanceId choisi par le joueur, ou null = utilise l'équipe active du moment
-      tiersReached: [],      // IDs des paliers de récompense (victoires cumulées) déjà réclamés
-      history: [],           // 5 derniers duels : { opponentName, won, eloChange, timestamp }
+      tiersReached: [],      // IDs des paliers de récompense (victoires cumulées) déjà réclamés — partagés
+      history: [],           // 5 derniers duels (tous modes confondus) : { opponentName, won, eloChange, mode, timestamp }
     },
     dailyLogin: {           // Progression des cycles de récompense de connexion quotidienne
       progress: {},         // { [cycleId]: { currentDay: 1, lastClaimDate: 'YYYY-MM-DD'|null } }

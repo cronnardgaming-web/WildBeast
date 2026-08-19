@@ -1334,20 +1334,23 @@ const WBGameState = (() => {
   }
 
   /**
-   * Enregistre le résultat d'un duel PvP : ELO, victoires/défaites, Instinct
-   * Primaire gagné (uniquement en cas de victoire), historique des 5 derniers
-   * duels. Aucun XP/Or/Essence Sauvage n'est distribué ici.
+   * Enregistre le résultat d'un duel PvP : ELO (du bon classement selon le
+   * mode), victoires/défaites, Instinct Primaire gagné (uniquement en cas de
+   * victoire, partagé entre les 2 modes), historique des 5 derniers duels.
+   * Aucun XP/Or/Essence Sauvage n'est distribué ici.
    * @param {boolean} didWin
    * @param {string} opponentName
    * @param {number} opponentElo
+   * @param {boolean} [isLive=false] true = Duel en Direct (classement ELO séparé), false = Duel à Distance
    */
-  function registerPvpResult(didWin, opponentName, opponentElo) {
+  function registerPvpResult(didWin, opponentName, opponentElo, isLive = false) {
     const p = _state.player;
-    p.pvp = p.pvp || { stamina: { current: 10, max: 10, lastRegen: Date.now() }, elo: 1000, currency: 0, defenseTeam: null, tiersReached: [], history: [] };
+    p.pvp = p.pvp || { stamina: { current: 10, max: 10, lastRegen: Date.now() }, eloAsync: 1000, eloLive: 1000, currency: 0, defenseTeam: null, tiersReached: [], history: [] };
     const cfg = _state.config.combat?.pvp || {};
+    const eloKey = isLive ? 'eloLive' : 'eloAsync';
 
-    const { newElo, change } = computePvpEloChange(p.pvp.elo ?? cfg.eloStarting ?? 1000, opponentElo, didWin);
-    p.pvp.elo = newElo;
+    const { newElo, change } = computePvpEloChange(p.pvp[eloKey] ?? cfg.eloStarting ?? 1000, opponentElo, didWin);
+    p.pvp[eloKey] = newElo;
 
     if (didWin) p.pvp.currency = (p.pvp.currency || 0) + (cfg.rewardPerWin ?? 15);
 
@@ -1355,9 +1358,9 @@ const WBGameState = (() => {
     if (didWin) p.stats.totalPvpWins = (p.stats.totalPvpWins || 0) + 1;
     else        p.stats.totalPvpLosses = (p.stats.totalPvpLosses || 0) + 1;
 
-    p.pvp.history = [{ opponentName, won: didWin, eloChange: change, timestamp: Date.now() }, ...(p.pvp.history || [])].slice(0, 5);
+    p.pvp.history = [{ opponentName, won: didWin, eloChange: change, mode: isLive ? 'live' : 'async', timestamp: Date.now() }, ...(p.pvp.history || [])].slice(0, 5);
 
-    _notify('pvpResultRegistered', { didWin, eloChange: change, newElo });
+    _notify('pvpResultRegistered', { didWin, eloChange: change, newElo, isLive });
     _autoSave();
     return { eloChange: change, newElo, currencyEarned: didWin ? (cfg.rewardPerWin ?? 15) : 0 };
   }
@@ -1469,7 +1472,8 @@ const WBGameState = (() => {
       tourneeProgress: getTourneeProgress(),
       galleryEntries:  Object.keys(_state.player.catalogue || {}).length,
       trophyBestScore: _state.player.trophy?.bestScore || 0,
-      pvpElo:          _state.player.pvp?.elo || 1000,
+      pvpEloAsync:     _state.player.pvp?.eloAsync || 1000,
+      pvpEloLive:      _state.player.pvp?.eloLive || 1000,
     };
   }
 

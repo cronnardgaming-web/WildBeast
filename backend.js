@@ -180,7 +180,8 @@ const WBBackend = (() => {
       tournee_progress: stats.tourneeProgress,
       gallery_entries: stats.galleryEntries,
       trophy_best_score: stats.trophyBestScore,
-      pvp_elo: stats.pvpElo,
+      pvp_elo: stats.pvpEloAsync,
+      pvp_elo_live: stats.pvpEloLive,
       updated_at: new Date().toISOString(),
     });
     if (error) console.error('[WBBackend] saveLeaderboardStats:', error);
@@ -188,7 +189,7 @@ const WBBackend = (() => {
 
   /**
    * Charge le classement public, trié par la colonne demandée.
-   * @param {'aura_total'|'tournee_progress'|'gallery_entries'|'trophy_best_score'} column
+   * @param {'aura_total'|'tournee_progress'|'gallery_entries'|'trophy_best_score'|'pvp_elo'|'pvp_elo_live'} column
    * @param {number} [limit=100]
    */
   async function loadLeaderboard(column, limit = 100) {
@@ -244,6 +245,83 @@ const WBBackend = (() => {
     return data || [];
   }
 
+  // ─── DUEL EN DIRECT (PvP temps réel) ──────────────────────────────────────────
+
+  /** Rejoint la file d'attente du Duel en Direct */
+  async function joinPvpLiveQueue(userId, displayName, elo, teamSnapshot) {
+    const { error } = await _client.from('pvp_live_queue').upsert({
+      user_id: userId, display_name: displayName, elo, team_snapshot: teamSnapshot, joined_at: new Date().toISOString(),
+    });
+    if (error) console.error('[WBBackend] joinPvpLiveQueue:', error);
+  }
+
+  /** Quitte la file d'attente (recherche annulée) */
+  async function leavePvpLiveQueue(userId) {
+    const { error } = await _client.from('pvp_live_queue').delete().eq('user_id', userId);
+    if (error) console.error('[WBBackend] leavePvpLiveQueue:', error);
+  }
+
+  /**
+   * Cherche un autre joueur déjà en attente (jamais soi-même). Ne retire PAS
+   * la ligne trouvée — c'est à l'appelant de gérer la création du salon et le
+   * retrait des deux lignes de la file, pour limiter le risque de double-appariement.
+   */
+  async function findPvpLiveOpponent(excludeUserId) {
+    const { data, error } = await _client
+      .from('pvp_live_queue')
+      .select('user_id, display_name, elo, team_snapshot')
+      .neq('user_id', excludeUserId)
+      .order('joined_at', { ascending: true })
+      .limit(1);
+    if (error) { console.error('[WBBackend] findPvpLiveOpponent:', error); return null; }
+    return (data && data[0]) || null;
+  }
+
+  /** Crée le salon de duel (appelé par celui qui déclenche l'appariement) */
+  async function createPvpLiveDuel(duel) {
+    const { data, error } = await _client.from('pvp_live_duels').insert(duel).select().single();
+    if (error) { console.error('[WBBackend] createPvpLiveDuel:', error); return null; }
+    return data;
+  }
+
+  /** Charge l'état actuel d'un salon de duel (utile à la reconnexion) */
+  async function loadPvpLiveDuel(duelId) {
+    const { data, error } = await _client.from('pvp_live_duels').select('*').eq('id', duelId).single();
+    if (error) { console.error('[WBBackend] loadPvpLiveDuel:', error); return null; }
+    return data;
+  }
+
+  /** Met à jour l'état du salon de duel (appelé par l'hôte après chaque action résolue) */
+  async function updatePvpLiveDuel(duelId, patch) {
+    const { error } = await _client.from('pvp_live_duels')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', duelId);
+    if (error) console.error('[WBBackend] updatePvpLiveDuel:', error);
+  }
+
+  /** S'abonne aux mises à jour en temps réel d'un salon de duel précis */
+  function subscribePvpLiveDuel(duelId, onUpdate) {
+    const channel = _client
+      .channel(`pvp_duel_${duelId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pvp_live_duels', filter: `id=eq.${duelId}` },
+        (payload) => onUpdate(payload.new))
+      .subscribe();
+    return () => _client.removeChannel(channel);
+  }
+
+  /** Cherche un salon de duel actif où l'utilisateur est participant (hôte OU invité) */
+  async function findMyActivePvpLiveDuel(userId) {
+    const { data, error } = await _client
+      .from('pvp_live_duels')
+      .select('*')
+      .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
+      .neq('status', 'finished')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (error) { console.error('[WBBackend] findMyActivePvpLiveDuel:', error); return null; }
+    return (data && data[0]) || null;
+  }
+
   return {
     init, getSession, signUp, signIn, signOut,
     loadGameData, saveGameData, loadPlayerSave, savePlayerData,
@@ -251,5 +329,8 @@ const WBBackend = (() => {
     loadAllProfiles, loadAllPlayerSaves, loadBackupDates, restorePlayerFromBackup,
     saveLeaderboardStats, loadLeaderboard,
     savePvpDefenseTeam, loadRandomPvpOpponent, loadPvpOpponentPool,
+    joinPvpLiveQueue, leavePvpLiveQueue, findPvpLiveOpponent,
+    createPvpLiveDuel, loadPvpLiveDuel, updatePvpLiveDuel, subscribePvpLiveDuel,
+    findMyActivePvpLiveDuel,
   };
 })();

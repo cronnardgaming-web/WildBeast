@@ -942,6 +942,7 @@ const WBCombatEngine = (() => {
         log: [], result: null, capturable: [], rewards: null,
         trophyScore: null,
         pvpOpponent: options.pvpOpponent || null, // { userId, name, elo }
+        isLiveDuel: !!options.isLiveDuel,          // true = Duel en Direct (2 joueurs humains, pas d'IA)
       };
       _startRound();
       return _battle;
@@ -1236,6 +1237,14 @@ const WBCombatEngine = (() => {
       const players = _battle.playerTeam.filter(p => p.alive);
       if (players.length === 0) { _checkBattleEnd(); return; }
 
+      // ── Duel en Direct : ce camp est un VRAI second joueur humain, pas une
+      // IA. On met le combat en pause et on attend son choix, relayé depuis
+      // l'extérieur via resolveAttack() une fois reçu (cf. backend Realtime).
+      if (_battle.isLiveDuel) {
+        _emit('awaitingRemoteAction', { actor: combatant, battle: _battle });
+        return;
+      }
+
       const chosenTarget = _aiChooseTarget(combatant, players);
       if (chosenTarget) {
         // Hypnose : si l'ennemi est charmé, sa cible est redirigée vers un coéquipier
@@ -1267,6 +1276,36 @@ const WBCombatEngine = (() => {
    * @param {string} attackerInstanceId - ID de l'attaquant joueur (doit être l'acteur courant)
    * @param {string} targetInstanceId   - ID de la cible ennemie
    */
+  /**
+   * Résout l'attaque d'un combattant du camp "ennemi" en Duel en Direct —
+   * équivalent générique de playerAttack, mais pour le second joueur humain
+   * (dont les créatures vivent dans _battle.enemyTeam du point de vue de
+   * l'hôte). Appelée une fois le choix du joueur distant reçu.
+   */
+  function resolveRemoteAttack(attackerInstanceId, targetInstanceId) {
+    if (!_battle || _battle.phase !== 'enemy' || !_battle.isLiveDuel) return;
+    if (_battle.currentActor !== attackerInstanceId) return;
+
+    const attacker = _battle.enemyTeam.find(c => c.instanceId === attackerInstanceId && c.alive);
+    const chosenTarget = _battle.playerTeam.find(c => c.instanceId === targetInstanceId && c.alive);
+    if (!attacker || !chosenTarget) return;
+
+    const target = _checkCharmRedirect(attacker) || chosenTarget;
+    _processPreAttack(attacker);
+    const result = _executeAttack(attacker, target);
+    _logAction(attacker, target, result);
+    _emit('enemyAttack', { attacker, target, result });
+    if (!result.evaded && target.alive && result.damage > 0) {
+      _processPostDamageCounter(target, attacker);
+    }
+
+    _processEndOfTurn(attacker);
+
+    _battle.turnIndex++;
+    if (_checkBattleEnd()) return;
+    setTimeout(_advanceTurn, 750);
+  }
+
   function playerAttack(attackerInstanceId, targetInstanceId) {
     if (!_battle || _battle.phase !== 'player') return;
     if (_battle.currentActor !== attackerInstanceId) return;
@@ -1537,7 +1576,7 @@ const WBCombatEngine = (() => {
     if (_battle.mode === 'pvp') {
       const didWin = result === 'victory';
       const opp = _battle.pvpOpponent || { name: 'Adversaire', elo: 1000 };
-      const pvpResult = WBGameState.registerPvpResult(didWin, opp.name, opp.elo);
+      const pvpResult = WBGameState.registerPvpResult(didWin, opp.name, opp.elo, !!_battle.isLiveDuel);
       _battle.rewards = { didWin, ...pvpResult };
       _emit(result, { rewards: _battle.rewards, battle: _battle });
       return;
@@ -1749,5 +1788,5 @@ const WBCombatEngine = (() => {
 
   // ─── API PUBLIQUE ─────────────────────────────────────────────────────────────
 
-  return { start, playerAttack, attemptCapture, getBattle, reset, _aiChooseTarget, _computePowerProfile };
+  return { start, playerAttack, resolveRemoteAttack, attemptCapture, getBattle, reset, _aiChooseTarget, _computePowerProfile };
 })();

@@ -3512,6 +3512,28 @@
     box-shadow:0 0 8px var(--accent);
   }
 
+  /* Écran de recherche — Duel en Direct */
+  .duel-live-searching{ display:flex; flex-direction:column; align-items:center; gap:16px; padding:30px 0; }
+  .duel-live-spinner{
+    width:52px; height:52px; border-radius:50%;
+    border:4px solid var(--surface-2); border-top-color:var(--accent);
+    animation:duelSpin 1s linear infinite;
+  }
+  @keyframes duelSpin{ to{ transform:rotate(360deg); } }
+  .duel-live-searching-text{ font-size:.85rem; color:var(--text-dim); }
+
+  /* Minuteur de tour (20s) — visible des deux côtés pendant un Duel en Direct */
+  .duel-live-timer{
+    display:flex; align-items:center; justify-content:center;
+    margin:0 auto 10px; width:fit-content;
+    background:var(--surface-2); border:1.5px solid var(--accent);
+    border-radius:999px; padding:5px 14px;
+    font-family:var(--font-mono); font-weight:800; font-size:.85rem;
+  }
+  .duel-live-timer.duel-live-timer-urgent{ border-color:var(--danger); color:var(--danger); animation:duelTimerPulse .6s ease-in-out infinite; }
+  @keyframes duelTimerPulse{ 0%,100%{ opacity:1; } 50%{ opacity:.5; } }
+  .battle-target-row{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+
   /* Popup de réclamation de connexion quotidienne */
   .daily-login-popup{ max-width:380px; }
   .login-cycle-days-popup{ margin:12px 0 16px; flex-wrap:wrap; justify-content:center; }
@@ -3685,6 +3707,7 @@
       <section id="screen-duel-defense-team" class="screen"></section>
       <section id="screen-duel-rewards" class="screen"></section>
       <section id="screen-duel-shop" class="screen"></section>
+      <section id="screen-duel-live-queue" class="screen"></section>
       <section id="screen-gacha" class="screen"></section>
       <section id="screen-equip" class="screen"></section>
       <section id="screen-inventory" class="screen"></section>
@@ -3969,16 +3992,95 @@
       // sécurité plus bas (les deux passent par CETTE fonction, donc les
       // couper ici les coupe bien toutes les deux en même temps).
       let _autosaveSuspended = false;
+      let _playerSaveSeq = 0; // numéro de séquence croissant : une sauvegarde plus ancienne ne doit JAMAIS écraser une plus récente déjà confirmée
+      let _lastKnownGoodPlayer = playerData ? JSON.parse(JSON.stringify(playerData)) : null; // référence pour détecter un effondrement suspect
+
+      /**
+       * Détecte un effondrement suspect de la progression (collection, équipements,
+       * chapitres débloqués) par rapport à la dernière version connue comme bonne —
+       * signe probable d'un chargement incomplet plutôt qu'une vraie action du
+       * joueur, puisqu'aucune mécanique normale du jeu ne réduit ces nombres.
+       * @returns {string|null} une description du problème, ou null si tout va bien
+       */
+      function _detectSuspiciousPlayerCollapse(prev, next) {
+        if (!prev) return null; // rien à comparer au tout premier chargement
+        const prevColl  = (prev.collection || []).length;
+        const nextColl  = (next.collection || []).length;
+        const prevEquip = (prev.equipInventory || []).length;
+        const nextEquip = (next.equipInventory || []).length;
+        const prevStory = Object.keys(prev.storyMode || {}).length;
+        const nextStory = Object.keys(next.storyMode || {}).length;
+
+        // Seuil : on tolère une petite baisse (au cas où une vraie mécanique
+        // future viendrait à en retirer un ou deux), mais un effondrement
+        // massif et soudain n'a aucune raison légitime de se produire seul.
+        if (prevColl >= 5 && nextColl === 0) return `Collection passée de ${prevColl} à 0 créature`;
+        if (prevColl >= 10 && nextColl < prevColl * 0.3) return `Collection effondrée : ${prevColl} → ${nextColl} créatures`;
+        if (prevEquip >= 5 && nextEquip < prevEquip * 0.3) return `Équipements effondrés : ${prevEquip} → ${nextEquip}`;
+        if (prevStory > 0 && nextStory === 0) return `Progression Mode Histoire disparue (${prevStory} chapitre(s) → 0)`;
+        return null;
+      }
+
+      /** Petite bannière d'alerte autonome — n'a pas besoin des fonctions privées de ui.js */
+      function _showSafetyBanner(message) {
+        document.getElementById('safety-banner')?.remove();
+        const banner = document.createElement('div');
+        banner.id = 'safety-banner';
+        banner.textContent = message;
+        banner.style.cssText = `
+          position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:99999;
+          background:#7a1f1f; color:#fff; padding:10px 18px; border-radius:10px;
+          font-family:sans-serif; font-size:.85rem; font-weight:700;
+          box-shadow:0 4px 16px rgba(0,0,0,.4); max-width:90vw; text-align:center;
+        `;
+        document.body.appendChild(banner);
+        setTimeout(() => banner.remove(), 6000);
+      }
+
       function _persist(state) {
         if (_autosaveSuspended) return; // édition d'un autre joueur en cours, cf. admin.js
         const { player, ...structural } = state;
 
         const playerJson = JSON.stringify(player);
         if (playerJson !== _lastPlayerJSON) {
+          const problem = _detectSuspiciousPlayerCollapse(_lastKnownGoodPlayer, player);
+          if (problem) {
+            console.error(`[Autosave] 🚨 Sauvegarde BLOQUÉE — anomalie détectée : ${problem}. Rechargement de sécurité en cours...`);
+            _showSafetyBanner('⚠️ Anomalie détectée — resynchronisation de ta progression en cours...');
+            // On ne sauvegarde surtout PAS cet état suspect. On recharge la
+            // vraie version depuis Supabase pour resynchroniser proprement,
+            // plutôt que de continuer à jouer sur un état local corrompu.
+            WBBackend.loadPlayerSave(userId).then(fresh => {
+              if (fresh) {
+                WBGameState.updatePlayer(fresh);
+                _lastKnownGoodPlayer = JSON.parse(JSON.stringify(fresh));
+                _lastPlayerJSON = JSON.stringify(fresh);
+              }
+            });
+            return; // surtout : ne pas laisser tomber dans l'envoi normal ci-dessous
+          }
+
           _pendingSaveCount++;
+          const mySeq = ++_playerSaveSeq;
           WBBackend.savePlayerData(userId, player)
             .then(() => {
-              _lastPlayerJSON = playerJson;
+              if (mySeq === _playerSaveSeq) {
+                _lastPlayerJSON = playerJson;
+                _lastKnownGoodPlayer = JSON.parse(playerJson); // mise à jour de la référence seulement après un envoi réussi et non périmé
+              } else {
+                // Cette sauvegarde a fini APRÈS une plus récente : elle vient
+                // potentiellement d'écraser des données plus fraîches sur le
+                // serveur. On renvoie tout de suite l'état RÉEL actuel pour
+                // corriger ça, plutôt que de laisser la version périmée en place.
+                console.warn('[Autosave] Sauvegarde arrivée en retard — correction immédiate.');
+                const freshPlayer = WBGameState.get().player;
+                WBBackend.savePlayerData(userId, freshPlayer)
+                  .then(() => {
+                    _lastPlayerJSON = JSON.stringify(freshPlayer);
+                    _lastKnownGoodPlayer = JSON.parse(JSON.stringify(freshPlayer));
+                  })
+                  .catch(err => console.error('[Autosave] Correction après sauvegarde tardive :', err));
+              }
               // Publie aussi les chiffres de classement (calculés localement,
               // peu coûteux) — utilise le nom en jeu du joueur, plus parlant
               // qu'un email dans un classement public.
