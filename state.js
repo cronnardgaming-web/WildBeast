@@ -578,6 +578,26 @@ const WBGameState = (() => {
   // ─── MUTATIONS ADMIN ─────────────────────────────────────────────────────────
 
   /** Remplace la config globale */
+  /**
+   * Restaure UNIQUEMENT les données structurelles partagées (personnages,
+   * types, bannières, chapitres...) depuis une version fraîchement rechargée
+   * du serveur — ne touche JAMAIS à _state.player, contrairement à init().
+   * Utilisé comme filet de sécurité si une sauvegarde corrompue de ces
+   * données a été détectée (cf. _detectSuspiciousGameDataCollapse).
+   * @param {object} fresh - le résultat de WBBackend.loadGameData()
+   */
+  function restoreStructuralData(fresh) {
+    if (!fresh) return;
+    const keys = [
+      'config', 'types', 'typeMatrix', 'tagCategories', 'tags', 'passives',
+      'characters', 'equipment', 'items', 'shopListings', 'pvpShopListings',
+      'dailyLoginCycles', 'dailyQuests', 'weeklyQuests', 'permanentQuests',
+      'equipBanners', 'banners',
+    ];
+    keys.forEach(k => { if (fresh[k] !== undefined) _state[k] = fresh[k]; });
+    _notify('structuralDataRestored');
+  }
+
   function updateConfig(patch) {
     // Merger en profondeur les clés du patch dans la config existante
     // sans écraser les autres clés (tutorial, storyMode, gacha, etc.)
@@ -2190,7 +2210,7 @@ const WBGameState = (() => {
     getCharDefs, getEquipDefs, getBanners, getCharDef, getPlayerChar, getTeam,
     addCharacterToCollection, addXpToCharacter, addXpToPlayer, setTeam, equipItem,
     modifyResources, regenEnergy, regenPvpStamina,
-    updateConfig, updateCharDef, addCharDef, removeCharDef, reorderCharDefs,
+    updateConfig, restoreStructuralData, updateCharDef, addCharDef, removeCharDef, reorderCharDefs,
     updateTypeMatrix, updateTypes, reorderTypes, addEquipDef, updateEquipDef, removeEquipDef, reorderEquipDefs,
     addPassive, updatePassive, removePassive, getPassivesForCharacter,
     addTagCategory, updateTagCategory, removeTagCategory,

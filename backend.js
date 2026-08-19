@@ -165,6 +165,25 @@ const WBBackend = (() => {
     await savePlayerData(userId, data.data);
   }
 
+  /** Liste les sauvegardes de secours disponibles pour les données de jeu partagées (les plus récentes en premier) */
+  async function loadGameDataBackupList() {
+    const { data, error } = await _client
+      .from('game_data_backup').select('backup_id, backed_up_at')
+      .order('backed_up_at', { ascending: false });
+    if (error) { console.error('[WBBackend] loadGameDataBackupList:', error); return []; }
+    return data || [];
+  }
+
+  /** Restaure les données de jeu partagées depuis UNE sauvegarde de secours précise (ne touche à AUCUNE donnée joueur) */
+  async function restoreGameDataFromBackup(backupId) {
+    const { data, error } = await _client
+      .from('game_data_backup').select('data').eq('backup_id', backupId).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error('Cette sauvegarde de secours est introuvable.');
+    await saveGameData(data.data);
+    return data.data;
+  }
+
   // ─── CLASSEMENTS (leaderboards) ────────────────────────────────────────────
 
   /**
@@ -327,6 +346,7 @@ const WBBackend = (() => {
     loadGameData, saveGameData, loadPlayerSave, savePlayerData,
     isCurrentUserAdmin, setCurrentUserId, getCurrentUserId, storageClient,
     loadAllProfiles, loadAllPlayerSaves, loadBackupDates, restorePlayerFromBackup,
+    loadGameDataBackupList, restoreGameDataFromBackup,
     saveLeaderboardStats, loadLeaderboard,
     savePvpDefenseTeam, loadRandomPvpOpponent, loadPvpOpponentPool,
     joinPvpLiveQueue, leavePvpLiveQueue, findPvpLiveOpponent,

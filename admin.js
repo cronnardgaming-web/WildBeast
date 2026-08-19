@@ -6370,11 +6370,59 @@ const WBAdminPanel = (() => {
   // policies RLS ajoutées par supabase_setup_admin_accounts.sql — sans elles,
   // cet onglet affiche simplement une liste vide (aucune erreur, aucun crash).
 
+  /** Charge et affiche la liste des sauvegardes de secours disponibles pour les données de jeu partagées */
+  async function _loadGameDataBackupInfo() {
+    const backups = await WBBackend.loadGameDataBackupList();
+    const el = document.getElementById('game-data-backup-info');
+    if (!el) return; // l'onglet a peut-être changé entre-temps
+    if (backups.length === 0) {
+      el.innerHTML = `<p style="color:#f87171;font-size:.82rem">⚠️ Aucune sauvegarde de secours trouvée — exécute <code>add_game_data_backup.sql</code> (puis <code>upgrade_game_data_backup.sql</code>) dans Supabase pour l'activer.</p>`;
+      return;
+    }
+    el.innerHTML = `
+      <p style="font-size:.78rem;color:#888;margin-bottom:8px">${backups.length} sauvegarde(s) disponible(s), de la plus récente à la plus ancienne :</p>
+      <div class="admin-list">
+        ${backups.map(b => `
+          <div class="admin-list-item">
+            <div class="admin-list-item-info">
+              <div class="admin-list-item-name">${new Date(b.backed_up_at).toLocaleString('fr-FR')}</div>
+            </div>
+            <div class="admin-list-item-actions">
+              <button class="admin-btn admin-btn-danger admin-btn-sm" onclick="WBAdminPanel._restoreGameDataBackup('${b.backup_id}')">⏪ Restaurer celle-ci</button>
+            </div>
+          </div>`).join('')}
+      </div>
+    `;
+  }
+
+  /** Restaure les données de jeu partagées depuis une sauvegarde de secours précise (aucun impact sur les joueurs) */
+  async function _restoreGameDataBackup(backupId) {
+    if (!confirm('Restaurer les données de jeu partagées (personnages, chapitres, bannières...) depuis cette sauvegarde ? Toute modification faite depuis sera perdue. Les données des joueurs ne sont PAS concernées.')) return;
+    try {
+      const fresh = await WBBackend.restoreGameDataFromBackup(backupId);
+      WBGameState.restoreStructuralData(fresh);
+      _notify('✅ Données de jeu restaurées depuis la sauvegarde de secours.');
+      switchTab('player-accounts');
+    } catch (e) {
+      _notify(`❌ Échec de la restauration : ${e.message}`, 'error');
+    }
+  }
+
   function _renderPlayerAccountsTab() {
     // Le chargement est asynchrone (plusieurs requêtes Supabase) : on affiche
     // un espace réservé tout de suite, puis on le remplit une fois prêt.
     _loadPlayerAccountsData();
+    _loadGameDataBackupInfo();
     return `
+      <div class="admin-section">
+        <div class="admin-section-title">🌍 Secours des données de jeu partagées</div>
+        <p style="font-size:.8rem;color:#888;margin-bottom:10px;">
+          Personnages, chapitres du Mode Histoire, bannières... — sauvegardés automatiquement toutes les 6h.
+          En cas de problème (donnée effacée/corrompue par erreur), tu peux revenir à la dernière version de secours.
+        </p>
+        <div id="game-data-backup-info"><p style="color:#888">⏳ Vérification...</p></div>
+      </div>
+      <hr class="admin-sep" />
       <div class="admin-section">
         <div class="admin-section-title">👥 Comptes joueurs</div>
         <p style="font-size:.8rem;color:#888;margin-bottom:14px;">
@@ -7298,6 +7346,7 @@ const WBAdminPanel = (() => {
     _previewBackground, _saveBackground, _removeBackground,
     _runCloudImport,
     _openPlayerEditor, _savePlayerImpersonation, _cancelPlayerImpersonation, _confirmRestoreBackup, _quickSavePlayerCurrency,
+    _restoreGameDataBackup,
     _dragStart, _dragOver, _dragLeave, _dragEnd, _dragDropChar, _dragDropEquip, _dragDropEvoStage, _dragDropType,
     _sortCharList, _filterCharList, _sortEquipList,
   };
